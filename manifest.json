@@ -21,4 +21,8 @@
         "main": "./src/main.js",
         "preload": "./src/preload.js"
     }
+    "repository": {
+        "repo": "elegantloneliness/qqMessageBlocker",
+        "branch": "main"
+      }
 }
