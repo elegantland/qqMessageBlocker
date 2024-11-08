@@ -10,11 +10,8 @@
         loadBlockedWords() {
             const savedWords = localStorage.getItem('blockedWords');
             const defaultWords = [
-                '运势',
-                '建议你吃:',
-                '@幻想 /',
-                '@AL_1S /',
-                '您今天的老婆群友'
+                '测试111',
+                
             ];
             return savedWords ? JSON.parse(savedWords) : defaultWords;
         }
