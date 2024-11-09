@@ -5,7 +5,6 @@
 - 支持多平台（并没有测试但应该可以）
 ## 安装方法
 1. 下载最新版本的LiteLoaderQQNT插件和本插件
-   百度网盘链接: https://pan.baidu.com/s/13DoGJid0kfQsv6bGc0TWXA?pwd=1111 提取码: 1111 
 3. 在设置里找到LiteLoaderQQNT的相关设置，从那里安装 
 4. 重启 QQ
 ## 使用方法
