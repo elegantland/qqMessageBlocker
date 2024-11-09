@@ -4,9 +4,7 @@
 - 支持自定义关键词屏蔽
 - 支持多平台（并没有测试但应该可以）
 - 效果图
-- 
-
-https://github.com/user-attachments/assets/0261c79f-d08c-49de-8cf4-7997fe68fb5a
+![test](https://github.com/user-attachments/assets/9eef9ed0-dccd-49f2-85b8-70f67a49058e)
 
 
 ## 安装方法
