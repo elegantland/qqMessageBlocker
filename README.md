@@ -9,7 +9,7 @@
 
 
 ## 安装方法
-1. 下载最新版本的LiteLoaderQQNT插件和本插件
+1. 下载最新版本的LiteLoaderQQNT插件和本插件。LiteLoaderQQNT 官网：https://liteloaderqqnt.github.io
 3. 在设置里找到LiteLoaderQQNT的相关设置，从那里安装 
 4. 重启 QQ
 ## 使用方法
