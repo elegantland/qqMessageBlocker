@@ -4,6 +4,7 @@
 - 支持自定义关键词屏蔽
 - 支持多平台（并没有测试但应该可以）
 - 效果图
+- 
 ![test](https://github.com/user-attachments/assets/9eef9ed0-dccd-49f2-85b8-70f67a49058e)
 
 
