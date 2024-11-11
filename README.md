@@ -38,7 +38,7 @@
 
 ![image](https://github.com/user-attachments/assets/7e896ef2-cda1-4cd6-9d7b-04bf8895ee84)
 
-复制到记事本，CTRL+F 查找 data-face-index，后面跟的代码即是表情代码，然后打开按照上面的方法打开renderer.js进行修改即可（对renderer.js的修改记得使用英文逗号）
+复制到记事本，CTRL+F 查找 data-face-index，后面跟的代码即是表情代码，然后打开按照上面的方法打开renderer.js进行修改即可。修改完一样需要重启（对renderer.js的修改记得使用英文逗号）
 
 ![image](https://github.com/user-attachments/assets/dc68c1f3-482c-4248-ac31-57a46df2f299)
 ![image](https://github.com/user-attachments/assets/0ec10c41-751d-473b-88f3-897f8198048d)
@@ -55,5 +55,5 @@
 
 2024年11月11日16:45:51 1.0.1
 
-对设置界面进行了美化，同时修改了屏蔽词相关数据的存储方式，从localstorage到直接写入renderer.js
+对设置界面进行了美化，同时修改了屏蔽词相关数据的存储方式，从localstorage到直接写入renderer.js，这样子需要导入导出配置的话复制renderer.js就好了
 同时保留原来的localstorage存储（假如你能正常使用的话），所以屏蔽词设置界面建议用作查看屏蔽词是否添加成功.
