@@ -340,61 +340,134 @@ const DEFAULT_SPECIAL_BLOCKED_USERS = {
         showBlockedWordsModal() {
             const scrollView = document.querySelector('.q-scroll-view.scroll-view--show-scrollbar.liteloader');
             if (!scrollView) return;
-
+             
             scrollView.innerHTML = '';
             const container = document.createElement('div');
             container.style.cssText = `
-                padding: 20px;
+                padding: 16px;
                 background: var(--bg_bottom_standard);
                 color: var(--text_primary);
-            `;
-
+            `; 
             container.innerHTML = `
-                <h2 style="margin-bottom: 15px; color: var(--text_primary);">屏蔽词管理（部分情况下添加会失败，推荐去插件所在位置修改renderer.js）</h2>
-                <div style="margin-bottom: 15px; display: flex;">
-                    <input type="text" id="newBlockWord" 
-                        placeholder="输入要屏蔽的词" 
-                        style="flex: 1; padding: 8px; margin-right: 10px; 
-                        background: var(--bg_bottom_standard); 
-                        color: var(--text_primary);
-                        border: 1px solid var(--line_standard);
-                        border-radius: 4px;">
-                    <button id="addWordBtn" 
-                        style="padding: 8px 16px;
-                        background: var(--brand_standard);
-                        color: white;
-                        border: none;
-                        border-radius: 4px;
-                        cursor: pointer;">添加</button>
+            <div style="
+                background: white;
+                border-radius: 8px;
+                padding: 16px;
+                margin-bottom: 16px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            ">
+                <h2 style="
+                    margin-bottom: 16px; 
+                    color: var(--text_primary);
+                    font-size: 16px;
+                    font-weight: 500;
+                ">屏蔽词管理</h2>
+                <h2 style="
+                    margin-bottom: 16px; 
+                    color: var(--text_primary);
+                    font-size: 16px;
+                    font-weight: 500;
+                ">(在这个页面添加时有概率数据丢失，建议去renderer.js修改)</h2>
+                <div style="
+                    display: flex;
+                    gap: 8px;
+                    margin-bottom: 16px;
+                ">
+                    <input type="text" id="newBlockWord"
+                        placeholder="输入要屏蔽的词"
+                        style="
+                            flex: 1; 
+                            padding: 8px 12px;
+                            background: white;
+                            color: var(--text_primary);
+                            border: 1px solid #e0e0e0;
+                            border-radius: 4px;
+                            font-size: 14px;
+                            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+                        ">
+                    <button id="addWordBtn"
+                        style="
+                            padding: 8px 16px;
+                            background: var(--brand_standard);
+                            color: white;
+                            border: none;
+                            border-radius: 4px;
+                            cursor: pointer;
+                            font-size: 14px;
+                            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+                        ">添加</button>
                 </div>
-                <ul id="blockedWordsList" style="list-style: none; padding: 0; margin-bottom: 15px;"></ul>
+                <ul id="blockedWordsList" style="
+                    list-style: none; 
+                    padding: 0; 
+                    margin-bottom: 16px;
+                    max-height: 200px;
+                    overflow-y: auto;
+                "></ul>
+            </div>
+            <div style="
+                background: white;
+                border-radius: 8px;
+                padding: 16px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            ">
+                <h2 style="
+                    margin-bottom: 16px; 
+                    color: var(--text_primary);
+                    font-size: 16px;
+                    font-weight: 500;
+                ">屏蔽用户管理</h2>
                 
-                <h2 style="margin-bottom: 15px; color: var(--text_primary);">屏蔽用户管理（只会屏蔽该用户的说的某句话）</h2>
-                <div style="margin-bottom: 15px; display: flex;">
-                    <input type="text" id="specialUser" 
-                        placeholder="输入屏蔽用户" 
-                        style="flex: 1; padding: 8px; margin-right: 10px; 
-                        background: var(--bg_bottom_standard); 
-                        color: var(--text_primary);
-                        border: 1px solid var(--line_standard);
-                        border-radius: 4px;">
-                    <input type="text" id="specialKeywords" 
-                        placeholder="输入只属于该用户的屏蔽词" 
-                        style="flex: 1; padding: 8px; margin-right: 10px; 
-                        background: var(--bg_bottom_standard); 
-                        color: var(--text_primary);
-                        border: 1px solid var(--line_standard);
-                        border-radius: 4px;">
-                    <button id="addSpecialUserBtn" 
-                        style="padding: 8px 16px;
-                        background: var(--brand_standard);
-                        color: white;
-                        border: none;
-                        border-radius: 4px;
-                        cursor: pointer;">添加特殊用户</button>
+                <div style="
+                    display: flex;
+                    gap: 8px;
+                    margin-bottom: 16px;
+                ">
+                    <input type="text" id="specialUser"
+                        placeholder="输入屏蔽用户"
+                        style="
+                            flex: 1; 
+                            padding: 8px 12px;
+                            background: white;
+                            color: var(--text_primary);
+                            border: 1px solid #e0e0e0;
+                            border-radius: 4px;
+                            font-size: 14px;
+                            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+                        ">
+                    <input type="text" id="specialKeywords"
+                        placeholder="输入屏蔽词"
+                        style="
+                            flex: 1; 
+                            padding: 8px 12px;
+                            background: white;
+                            color: var(--text_primary);
+                            border: 1px solid #e0e0e0;
+                            border-radius: 4px;
+                            font-size: 14px;
+                            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+                        ">
+                    <button id="addSpecialUserBtn"
+                        style="
+                            padding: 8px 16px;
+                            background: var(--brand_standard);
+                            color: white;
+                            border: none;
+                            border-radius: 4px;
+                            cursor: pointer;
+                            font-size: 14px;
+                            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+                        ">添加</button>
                 </div>
-                <ul id="specialBlockedUsersList" style="list-style: none; padding: 0; margin-bottom: 15px;"></ul>
-            `;
+                <ul id="specialBlockedUsersList" style="
+                    list-style: none; 
+                    padding: 0; 
+                    margin-bottom: 16px;
+                    max-height: 200px;
+                    overflow-y: auto;
+                "></ul>
+            </div>
+        `;
 
             scrollView.appendChild(container);
             const renderWordsList = () => {
@@ -402,16 +475,34 @@ const DEFAULT_SPECIAL_BLOCKED_USERS = {
                 wordsList.innerHTML = this.blockedWordsManager.getWords().map(word => {
                     const encodedWord = word.replace(/'/g, '\\\'').replace(/"/g, '\\"');
                     return `
-                        <li style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; padding: 8px; background: var(--bg_standard); border-radius: 4px;">
-                            <span style="color: var(--text_primary); word-break: break-all;">${word}</span>
-                            <button class="delete-word-btn" data-word="${encodedWord}"
-                                style="padding: 4px 8px;
-                                background: #ff4d4f;
-                                color: white;
-                                border: none;
-                                border-radius: 4px;
-                                cursor: pointer;
-                                margin-left: 8px;">删除</button>
+                        <li style="
+                            margin-bottom: 8px; 
+                            display: flex; 
+                            justify-content: space-between; 
+                            align-items: center; 
+                            padding: 8px 12px; 
+                            background: white; 
+                            border-radius: 4px;
+                            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                            border: 1px solid #f0f0f0;
+                        ">
+                            <span style="
+                                color: var(--text_primary); 
+                                word-break: break-all;
+                                font-size: 14px;
+                            ">${word}</span>
+                            <button class="delete-word-btn" 
+                                data-word="${encodedWord}"
+                                style="
+                                    padding: 4px 8px;
+                                    background: #ff4d4f;
+                                    color: white;
+                                    border: none;
+                                    border-radius: 4px;
+                                    cursor: pointer;
+                                    font-size: 12px;
+                                    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+                                ">删除</button>
                         </li>
                     `;
                 }).join('');
@@ -428,16 +519,31 @@ const DEFAULT_SPECIAL_BLOCKED_USERS = {
                 const specialUsersList = container.querySelector('#specialBlockedUsersList');
                 specialUsersList.innerHTML = Object.entries(this.blockedWordsManager.specialBlockedUsers || {}).map(([username, keywords]) => {
                     return `
-                        <li style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; padding: 8px; background: var(--bg_standard); border-radius: 4px;">
-                            <span style="color: var(--text_primary); word-break: break-all;">${username}: ${keywords.join(', ')}</span>
-                            <button class="delete-special-user-btn" data-username="${username}"
-                                style="padding: 4px 8px;
-                                background: #ff4d4f;
-                                color: white;
-                                border: none;
-                                border-radius: 4px;
-                                cursor: pointer;
-                                margin-left: 8px;">删除</button>
+                <li style="
+                    margin-bottom: 8px; 
+                    display: flex; 
+                    justify-content: space-between; 
+                    align-items: center; 
+                    padding: 8px 12px; 
+                    background: white; 
+                    border-bottom: 1px solid #f0f0f0;
+                ">
+                    <span style="
+                        color: var(--text_primary); 
+                        word-break: break-all;
+                        font-size: 14px;
+                    ">${username}: ${keywords.join(', ')}</span>
+                            <button class="delete-special-user-btn" 
+                                data-username="${username}"
+                                style="
+                                    padding: 4px 8px;
+                                    background: #ff4d4f;
+                                    color: white;
+                                    border: none;
+                                    border-radius: 4px;
+                                    cursor: pointer;
+                                    font-size: 12px;
+                                ">删除</button>
                         </li>
                     `;
                 }).join('');
