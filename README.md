@@ -21,7 +21,7 @@
 
 ![QQ_1731315348067](https://github.com/user-attachments/assets/7fe364dc-5755-4c9c-bbc9-e6ad98498344)
 
-3. 仿照默认的样例添加需要屏蔽的关键词
+3. 仿照默认的样例添加需要屏蔽的关键词（对renderer.js的修改记得使用英文逗号）
 
 ![3420a0fe6c8608ed92781cfb93d9b31f](https://github.com/user-attachments/assets/0d074c22-a066-4988-a52e-76b2a72e113c)
 
@@ -38,7 +38,7 @@
 
 ![image](https://github.com/user-attachments/assets/7e896ef2-cda1-4cd6-9d7b-04bf8895ee84)
 
-复制到记事本，CTRL+F 查找 data-face-index，后面跟的代码即是表情代码，然后打开按照上面的方法打开renderer.js进行修改即可
+复制到记事本，CTRL+F 查找 data-face-index，后面跟的代码即是表情代码，然后打开按照上面的方法打开renderer.js进行修改即可（对renderer.js的修改记得使用英文逗号）
 
 ![image](https://github.com/user-attachments/assets/dc68c1f3-482c-4248-ac31-57a46df2f299)
 ![image](https://github.com/user-attachments/assets/0ec10c41-751d-473b-88f3-897f8198048d)
