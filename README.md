@@ -14,11 +14,17 @@
 4. 重启 QQ
 ## 使用方法
 1. 在设置中找到LiteLoaderQQNT选项，点击进入数据目录
+   
 ![f643b13ae4c6129486731a2bc6ffe7cc](https://github.com/user-attachments/assets/39aab0b8-c12f-401d-82c1-d2793a516af8)
+
 2.然后在该路径下以记事本方式打开LiteloaderQQNT\plugins\message_blocker\src\renderer.js
+
 3. 仿照默认的样例添加需要屏蔽的关键词
+
 ![3420a0fe6c8608ed92781cfb93d9b31f](https://github.com/user-attachments/assets/0d074c22-a066-4988-a52e-76b2a72e113c)
-4. 添加后重启QQ即可生效
+
+4. 修改后保存renderer.js，重启QQ即可生效
+
 ## bug反馈以及其他问题
 1.qq邮箱：2543971286@qq.com
 
