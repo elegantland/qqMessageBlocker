@@ -1,3 +1,13 @@
+// 默认屏蔽词列表
+const DEFAULT_BLOCKED_WORDS = [
+    '测试111',
+];
+// 默认特殊屏蔽用户配置
+const DEFAULT_SPECIAL_BLOCKED_USERS = {
+    'AL': ['@', '您'],
+    '儒雅': ['3', '多条件'],
+    '测试用户2': ['关键词A', '关键词B'],
+};
 (function () {
     // 屏蔽词管理类
     class BlockedWordsManager {
@@ -6,14 +16,39 @@
             // 确保在构造函数中加载特殊屏蔽用户
             this.specialBlockedUsers = this.loadSpecialBlockedUsers() || {};
         }
-
         loadBlockedWords() {
             const savedWords = localStorage.getItem('blockedWords');
-            const defaultWords = [
-                '测试111',
+            return savedWords ? JSON.parse(savedWords) : DEFAULT_BLOCKED_WORDS;
+        }
+        loadSpecialBlockedUsers() {
+            try {
+                const savedUsers = localStorage.getItem('specialBlockedUsers');
                 
-            ];
-            return savedWords ? JSON.parse(savedWords) : defaultWords;
+                // 如果没有本地存储数据，直接使用默认配置
+                if (!savedUsers) {
+                    localStorage.setItem('specialBlockedUsers', JSON.stringify(DEFAULT_SPECIAL_BLOCKED_USERS));
+                    return DEFAULT_SPECIAL_BLOCKED_USERS;
+                }
+                // 解析本地存储的数据
+                const parsedUsers = JSON.parse(savedUsers);
+                // 合并默认配置和本地存储的配置
+                const mergedUsers = { ...DEFAULT_SPECIAL_BLOCKED_USERS, ...parsedUsers };
+                // 去重和合并关键词
+                Object.keys(mergedUsers).forEach(username => {
+                    // 合并关键词，并去重
+                    const defaultKeywords = DEFAULT_SPECIAL_BLOCKED_USERS[username] || [];
+                    const savedKeywords = parsedUsers[username] || [];
+                    
+                    mergedUsers[username] = [...new Set([...defaultKeywords, ...savedKeywords])];
+                });
+                // 将合并后的配置保存回本地存储
+                localStorage.setItem('specialBlockedUsers', JSON.stringify(mergedUsers));
+                console.log('合并后的特殊屏蔽用户配置:', mergedUsers);
+                return mergedUsers;
+            } catch (error) {
+                console.error('加载特殊屏蔽用户时出错:', error);
+                return DEFAULT_SPECIAL_BLOCKED_USERS;
+            }
         }
         reprocessMessages() {
             try {
@@ -148,21 +183,7 @@
             }
             return false;
         }
-        loadSpecialBlockedUsers() {
-            try {
-                const savedUsers = localStorage.getItem('specialBlockedUsers');
-                if (!savedUsers) {
-                    console.log('未找到保存的特殊屏蔽用户，初始化为空对象');
-                    return {};
-                }
-                const parsedUsers = JSON.parse(savedUsers);
-                console.log('加载的特殊屏蔽用户:', parsedUsers);
-                return parsedUsers;
-            } catch (error) {
-                console.error('加载特殊屏蔽用户时出错:', error);
-                return {};
-            }
-        }
+
         isMessageBlocked(username, message) {
             // 首先检查普通屏蔽词
             const hasBlockedWord = this.blockedWords.some(word =>
@@ -227,14 +248,37 @@
             });
         }
         replaceContent(element) {
-            const usernameElement = element.querySelector('.avatar-span[aria-label]');
-            const messageContentElement = element.querySelector('.text-element .text-normal');
-
-            if (usernameElement && messageContentElement) {
-                const username = usernameElement.getAttribute('aria-label');
-                const message = messageContentElement.textContent.trim();
-
-                // 实时检查并隐藏消息
+            let username = '';
+            let message = '';
+        
+            // 获取用户名（兼容两种结构）
+            const usernameElement = element.querySelector('.user-name .text-ellipsis') || 
+                                   element.querySelector('.avatar-span');
+            
+            if (usernameElement) {
+                username = usernameElement.textContent?.trim() || 
+                          usernameElement.getAttribute('aria-label') || '';
+            }
+        
+            // 获取消息内容（兼容两种结构）
+            const messageContentElement = element.querySelector('.markdown-element') || 
+                                        element.querySelector('.text-element .text-normal');
+            
+            if (messageContentElement) {
+                message = messageContentElement.textContent.trim();
+            }
+        
+            // 调试输出
+            console.log('Processing message:', {
+                username,
+                message,
+                elementClasses: element.className,
+                hasUsername: !!usernameElement,
+                hasMessage: !!messageContentElement
+            });
+        
+            // 检查并处理消息
+            if (username && message) {
                 if (this.blockedWordsManager.isMessageBlocked(username, message)) {
                     element.style.display = 'none';
                 }
@@ -302,7 +346,7 @@
             `;
 
             container.innerHTML = `
-                <h2 style="margin-bottom: 15px; color: var(--text_primary);">屏蔽词管理</h2>
+                <h2 style="margin-bottom: 15px; color: var(--text_primary);">屏蔽词管理（部分情况下添加会失败，推荐去插件所在位置修改renderer.js）</h2>
                 <div style="margin-bottom: 15px; display: flex;">
                     <input type="text" id="newBlockWord" 
                         placeholder="输入要屏蔽的词" 
