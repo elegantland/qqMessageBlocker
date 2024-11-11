@@ -11,10 +11,14 @@ const DEFAULT_SPECIAL_BLOCKED_USERS = {
 
 };
 // 默认屏蔽表情ID
-const DEFAULT_BLOCKED_EMOJIS = [99999];//以滑稽表情和暴筋表情为例子const DEFAULT_BLOCKED_EMOJIS = [178，146];
+const DEFAULT_BLOCKED_EMOJIS = [99999];
+//以滑稽表情和暴筋表情为例子
+//const DEFAULT_BLOCKED_EMOJIS = [178，146];
 // 屏蔽人对应的表情ID
 const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
-    '儒雅': [99999],////以滑稽表情和暴筋表情为例子'儒雅' = [178，146];
+    '儒雅': [99999],
+    //以滑稽表情和暴筋表情为例子
+    //'儒雅' = [178，146];
 };
 (function () {
     // 屏蔽词管理类
