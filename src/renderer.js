@@ -1,16 +1,20 @@
 // 默认屏蔽词列表
 const DEFAULT_BLOCKED_WORDS = [
     '测试111',
-    '',
 
 ];
 // 默认特殊屏蔽用户配置
 const DEFAULT_SPECIAL_BLOCKED_USERS = {
     'AL': ['@', '您'],
     '儒雅': ['3', '多条件'],
-    '测试用户2': ['屏蔽词A', '屏蔽词B','',''],
-    '' : ['', ''],
-    
+    '测试用户2': ['屏蔽词A', '屏蔽词B', '', ''],
+
+};
+// 默认屏蔽表情ID
+const DEFAULT_BLOCKED_EMOJIS = [99999];//以滑稽表情和暴筋表情为例子const DEFAULT_BLOCKED_EMOJIS = [178，146];
+// 屏蔽人对应的表情ID
+const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
+    '儒雅': [99999],////以滑稽表情和暴筋表情为例子'儒雅' = [178，146];
 };
 (function () {
     // 屏蔽词管理类
@@ -18,7 +22,9 @@ const DEFAULT_SPECIAL_BLOCKED_USERS = {
         constructor() {
             this.blockedWords = this.loadBlockedWords() || [];
             // 确保在构造函数中加载特殊屏蔽用户
+            this.blockedEmojis = this.loadBlockedEmojis() || [];
             this.specialBlockedUsers = this.loadSpecialBlockedUsers() || {};
+            this.specialBlockedUsersEmojis = this.loadSpecialBlockedUsersEmojis() || {};
         }
         loadBlockedWords() {
             const savedWords = localStorage.getItem('blockedWords');
@@ -27,7 +33,7 @@ const DEFAULT_SPECIAL_BLOCKED_USERS = {
         loadSpecialBlockedUsers() {
             try {
                 const savedUsers = localStorage.getItem('specialBlockedUsers');
-                
+
                 // 如果没有本地存储数据，直接使用默认配置
                 if (!savedUsers) {
                     localStorage.setItem('specialBlockedUsers', JSON.stringify(DEFAULT_SPECIAL_BLOCKED_USERS));
@@ -42,7 +48,7 @@ const DEFAULT_SPECIAL_BLOCKED_USERS = {
                     // 合并关键词，并去重
                     const defaultKeywords = DEFAULT_SPECIAL_BLOCKED_USERS[username] || [];
                     const savedKeywords = parsedUsers[username] || [];
-                    
+
                     mergedUsers[username] = [...new Set([...defaultKeywords, ...savedKeywords])];
                 });
                 // 将合并后的配置保存回本地存储
@@ -54,19 +60,70 @@ const DEFAULT_SPECIAL_BLOCKED_USERS = {
                 return DEFAULT_SPECIAL_BLOCKED_USERS;
             }
         }
+        addSpecialBlockedUserEmoji(username, emojiId) {
+            if (!this.specialBlockedUsersEmojis) {
+                this.specialBlockedUsersEmojis = {};
+            }
+            if (!this.specialBlockedUsersEmojis[username]) {
+                this.specialBlockedUsersEmojis[username] = [];
+            }
+            if (!this.specialBlockedUsersEmojis[username].includes(emojiId)) {
+                this.specialBlockedUsersEmojis[username].push(emojiId);
+                this.saveConfig(); // 保存配置
+                return true; // 返回成功
+            }
+            return false; // 返回失败
+        }
+        // 移除特定用户的所有表情屏蔽
+        removeSpecialBlockedUserEmojis(username) {
+            if (this.specialBlockedUsersEmojis && this.specialBlockedUsersEmojis[username]) {
+                delete this.specialBlockedUsersEmojis[username]; // 删除用户的屏蔽信息
+                this.saveConfig(); // 保存配置
+            }
+        }
+        loadBlockedEmojis() {
+            const savedEmojis = localStorage.getItem('blockedEmojis');
+            return savedEmojis ? JSON.parse(savedEmojis) : DEFAULT_BLOCKED_EMOJIS;
+        }
+        loadSpecialBlockedUsersEmojis() {
+            const savedUsersEmojis = localStorage.getItem('specialBlockedUsersEmojis');
+            return savedUsersEmojis ? JSON.parse(savedUsersEmojis) : DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS;
+        }
+        // 添加屏蔽表情的相关方法
+        saveBlockedEmojis() {
+            localStorage.setItem('blockedEmojis', JSON.stringify(this.blockedEmojis));
+        }
+        addEmoji(emojiId) {
+            if (!this.blockedEmojis.includes(emojiId)) {
+                this.blockedEmojis.push(emojiId);
+                this.saveBlockedEmojis();
+                this.reprocessMessages();
+                return true;
+            }
+            return false;
+        }
+        removeEmoji(emojiId) {
+            const index = this.blockedEmojis.indexOf(emojiId);
+            if (index > -1) {
+                this.blockedEmojis.splice(index, 1);
+                this.saveBlockedEmojis();
+                return true;
+            }
+            return false;
+        }
         reprocessMessages() {
             try {
                 // 选择所有消息容器
                 const messageContainers = document.querySelectorAll('div.message-container');
-                
+
                 messageContainers.forEach(element => {
                     const usernameElement = element.querySelector('.avatar-span[aria-label]');
                     const messageContentElement = element.querySelector('.text-element .text-normal');
-                    
+
                     if (usernameElement && messageContentElement) {
                         const username = usernameElement.getAttribute('aria-label');
                         const message = messageContentElement.textContent.trim();
-                        
+
                         // 使用 isMessageBlocked 方法检查是否需要屏蔽
                         if (this.isMessageBlocked(username, message)) {
                             element.style.display = 'none';
@@ -76,7 +133,7 @@ const DEFAULT_SPECIAL_BLOCKED_USERS = {
                         }
                     }
                 });
-                
+
                 console.log('消息重新处理完成');
             } catch (error) {
                 console.error('重新处理消息时发生错误:', error);
@@ -188,28 +245,54 @@ const DEFAULT_SPECIAL_BLOCKED_USERS = {
             return false;
         }
 
-        isMessageBlocked(username, message) {
-            // 首先检查普通屏蔽词
+        isMessageBlocked(username, message, emojiIds) {
+            // 检查文字屏蔽
             const hasBlockedWord = this.blockedWords.some(word =>
                 message.toLowerCase().includes(word.toLowerCase())
             );
-            // 然后检查特殊屏蔽用户
+            // 检查特殊用户关键词
             const specialUserKeywords = this.specialBlockedUsers[username] || [];
             const hasSpecialBlockedUserKeyword = specialUserKeywords.some(keyword =>
                 message.toLowerCase().includes(keyword.toLowerCase().trim())
             );
-            // 输出调试信息
-            console.log('屏蔽检查详情', JSON.stringify({
+            // 检查表情屏蔽
+            const checkEmojiBlocked = (ids) => {
+                if (!ids || ids.length === 0) return false;
+
+                return ids.some(id => {
+                    // 确保 id 是数字，并进行严格匹配
+                    const numId = Number(id);
+
+                    // 检查全局屏蔽表情
+                    const isGlobalBlocked = this.blockedEmojis.includes(numId);
+
+                    // 检查针对特定用户的表情屏蔽
+                    const isUserSpecificBlocked =
+                        (this.specialBlockedUsersEmojis[username] || []).includes(numId);
+
+                    console.log(`检查表情 ${numId}:`, {
+                        isGlobalBlocked,
+                        isUserSpecificBlocked,
+                        globalBlockedEmojis: this.blockedEmojis,
+                        userSpecificBlockedEmojis: this.specialBlockedUsersEmojis[username]
+                    });
+
+                    return isGlobalBlocked || isUserSpecificBlocked;
+                });
+            };
+            const hasBlockedEmoji = checkEmojiBlocked(emojiIds);
+            // 详细日志
+            console.log('屏蔽检查结果:', {
+                hasBlockedWord,
+                hasSpecialBlockedUserKeyword,
+                hasBlockedEmoji,
                 username,
                 message,
-                specialUsers: this.specialBlockedUsers,
-                hasBlockedWord,
-                hasSpecialBlockedUserKeyword
-            }, null, 2).replace(/\\u([\d\w]{4})/gi, (match, grp) => {
-                return String.fromCharCode(parseInt(grp, 16)); 
-            }));
-            // 返回结果
-            return hasBlockedWord || hasSpecialBlockedUserKeyword;
+                emojiIds,
+                globalBlockedEmojis: this.blockedEmojis,
+                userSpecificBlockedEmojis: this.specialBlockedUsersEmojis[username]
+            });
+            return hasBlockedWord || hasSpecialBlockedUserKeyword || hasBlockedEmoji;
         }
     }
     function showToast(message, type = 'success') {
@@ -254,36 +337,79 @@ const DEFAULT_SPECIAL_BLOCKED_USERS = {
         replaceContent(element) {
             let username = '';
             let message = '';
-        
-            // 获取用户名（兼容两种结构）
-            const usernameElement = element.querySelector('.user-name .text-ellipsis') || 
-                                   element.querySelector('.avatar-span');
-            
+            let emojiIds = []; // 存储表情ID的数组
+            // 获取用户名
+            const usernameElement = element.querySelector('.user-name .text-ellipsis') ||
+                element.querySelector('.avatar-span');
             if (usernameElement) {
-                username = usernameElement.textContent?.trim() || 
-                          usernameElement.getAttribute('aria-label') || '';
+                username = usernameElement.textContent?.trim() ||
+                    usernameElement.getAttribute('aria-label') || '';
             }
-        
-            // 获取消息内容（兼容两种结构）
-            const messageContentElement = element.querySelector('.markdown-element') || 
-                                        element.querySelector('.text-element .text-normal');
-            
+            // 获取消息内容
+            const messageContentElement = element.querySelector('.markdown-element') ||
+                element.querySelector('.text-element .text-normal');
             if (messageContentElement) {
                 message = messageContentElement.textContent.trim();
             }
-        
-            // 调试输出
-            console.log('Processing message:', {
-                username,
-                message,
-                elementClasses: element.className,
-                hasUsername: !!usernameElement,
-                hasMessage: !!messageContentElement
+            // 更精确的表情识别方法
+            const extractEmojiId = (emojiElement) => {
+                try {
+                    // 优先尝试 data-face-index 属性
+                    const dataFaceIndex = emojiElement.getAttribute('data-face-index');
+                    if (dataFaceIndex) {
+                        return parseInt(dataFaceIndex);
+                    }
+                    // 尝试从 src 属性提取
+                    const src = emojiElement.getAttribute('src');
+                    if (src) {
+                        // 匹配 /178/png/178.png 这种模式
+                        const srcMatch = src.match(/\/(\d+)\/png\/\1\.png$/);
+                        if (srcMatch) {
+                            return parseInt(srcMatch[1]);
+                        }
+                        // 备选方案：匹配路径中的数字
+                        const pathMatch = src.match(/\/(\d+)\//);
+                        if (pathMatch) {
+                            return parseInt(pathMatch[1]);
+                        }
+                    }
+                    // 检查类名
+                    const classList = emojiElement.classList;
+                    for (let cls of classList) {
+                        const classMatch = cls.match(/emoji-(\d+)/);
+                        if (classMatch) return parseInt(classMatch[1]);
+                    }
+                    return null;
+                } catch (error) {
+                    console.error('提取表情ID时出错:', error, emojiElement);
+                    return null;
+                }
+            };
+            // 查找并提取所有表情ID
+            const emojiElements = element.querySelectorAll(
+                '.face-element__icon[data-face-index], .face-element__icon[src*="/Emoji/"]'
+            );
+            emojiIds = [];
+            emojiElements.forEach(emojiElement => {
+                const emojiId = extractEmojiId(emojiElement);
+                if (emojiId !== null) {
+                    emojiIds.push(emojiId);
+                    console.log('成功提取表情ID:', emojiId);
+                }
             });
-        
-            // 检查并处理消息
-            if (username && message) {
-                if (this.blockedWordsManager.isMessageBlocked(username, message)) {
+            // 调试日志
+            if (emojiIds.length > 0) {
+                console.log(`用户 ${username} 的消息中检测到表情ID:`, emojiIds);
+            }
+            // 检查是否需要屏蔽
+            if (username) {
+                const shouldBlock = this.blockedWordsManager.isMessageBlocked(
+                    username,
+                    message,
+                    emojiIds.length > 0 ? emojiIds : null
+                );
+                if (shouldBlock) {
+                    console.log(`已屏蔽用户 ${username} 的消息`);
                     element.style.display = 'none';
                 }
             }
@@ -340,14 +466,13 @@ const DEFAULT_SPECIAL_BLOCKED_USERS = {
         showBlockedWordsModal() {
             const scrollView = document.querySelector('.q-scroll-view.scroll-view--show-scrollbar.liteloader');
             if (!scrollView) return;
-             
             scrollView.innerHTML = '';
             const container = document.createElement('div');
             container.style.cssText = `
                 padding: 16px;
                 background: var(--bg_bottom_standard);
                 color: var(--text_primary);
-            `; 
+            `;
             container.innerHTML = `
             <div style="
                 background: white;
@@ -611,6 +736,265 @@ const DEFAULT_SPECIAL_BLOCKED_USERS = {
             if (addSpecialUserBtn) {
                 addSpecialUserBtn.addEventListener('click', addSpecialUserHandler);
             }
+            const emojiManageBlock = `
+            <div style="
+                background: white;
+                border-radius: 8px;
+                padding: 16px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                margin-top: 16px;
+            ">
+                <h2 style="
+                    margin-bottom: 16px; 
+                    color: var(--text_primary);
+                    font-size: 16px;
+                    font-weight: 500;
+                ">表情屏蔽管理</h2>
+                
+                <div style="
+                    display: flex;
+                    gap: 8px;
+                    margin-bottom: 16px;
+                ">
+                    <input type="text" id="newBlockEmoji"
+                        placeholder="输入要屏蔽的表情ID"
+                        style="
+                            flex: 1; 
+                            padding: 8px 12px;
+                            background: white;
+                            color: var(--text_primary);
+                            border: 1px solid #e0e0e0;
+                            border-radius: 4px;
+                            font-size: 14px;
+                            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+                        ">
+                    <button id="addEmojiBtn"
+                        style="
+                            padding: 8px 16px;
+                            background: var(--brand_standard);
+                            color: white;
+                            border: none;
+                            border-radius: 4px;
+                            cursor: pointer;
+                            font-size: 14px;
+                            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+                        ">添加</button>
+                </div>
+                <ul id="blockedEmojisList" style="
+                    list-style: none; 
+                    padding: 0; 
+                    margin-bottom: 16px;
+                    max-height: 200px;
+                    overflow-y: auto;
+                "></ul>
+            </div>
+    <div style="
+        background: white;
+        border-radius: 8px;
+        padding: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-top: 16px;
+    ">
+        <h2 style="
+            margin-bottom: 16px; 
+            color: var(--text_primary);
+            font-size: 16px;
+            font-weight: 500;
+        ">特定用户表情屏蔽管理</h2>
+        
+        <div style="
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        ">
+            <input type="text" id="specialUserEmoji"
+                placeholder="输入用户名"
+                style="
+                    flex: 1; 
+                    padding: 8px 12px;
+                    background: white;
+                    color: var(--text_primary);
+                    border: 1px solid #e0e0e0;
+                    border-radius: 4px;
+                    font-size: 14px;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+                ">
+            <input type="text" id="specialEmojiId"
+                placeholder="输入表情ID"
+                style="
+                    flex: 1; 
+                    padding: 8px 12px;
+                    background: white;
+                    color: var(--text_primary);
+                    border: 1px solid #e0e0e0;
+                    border-radius: 4px;
+                    font-size: 14px;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+                ">
+            <button id="addSpecialEmojiBtn"
+                style="
+                    padding: 8px 16px;
+                    background: var(--brand_standard);
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+                ">添加</button>
+        </div>
+        <ul id="specialBlockedEmojisList" style="
+            list-style: none; 
+            padding: 0; 
+            margin-bottom: 16px;
+            max-height: 200px;
+            overflow-y: auto;
+        "></ul>
+    </div>
+`;
+            // 将表情屏蔽管理块添加到容器中
+            container.innerHTML += emojiManageBlock;
+            // 表情列表渲染函数
+            const renderEmojisList = () => {
+                const emojisList = container.querySelector('#blockedEmojisList');
+                emojisList.innerHTML = this.blockedWordsManager.blockedEmojis.map(emojiId => {
+                    return `
+                    <li style="
+                        margin-bottom: 8px; 
+                        display: flex; 
+                        justify-content: space-between; 
+                        align-items: center; 
+                        padding: 8px 12px; 
+                        background: white; 
+                        border-radius: 4px;
+                        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                        border: 1px solid #f0f0f0;
+                    ">
+                        <span style="
+                            color: var(--text_primary); 
+                            word-break: break-all;
+                            font-size: 14px;
+                        ">${emojiId}</span>
+                        <button class="delete-emoji-btn" 
+                            data-emoji-id="${emojiId}"
+                            style="
+                                padding: 4px 8px;
+                                background: #ff4d4f;
+                                color: white;
+                                border: none;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                font-size: 12px;
+                                box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+                            ">删除</button>
+                    </li>
+                `;
+                }).join('');
+                const deleteButtons = emojisList.querySelectorAll('.delete-emoji-btn');
+                deleteButtons.forEach(button => {
+                    button.addEventListener('click', () => {
+                        const emojiId = parseInt(button.getAttribute('data-emoji-id'));
+                        this.blockedWordsManager.removeEmoji(emojiId);
+                        renderEmojisList(); // 重新渲染列表
+                    });
+                });
+            };
+// 添加渲染特定用户表情屏蔽列表的函数
+const renderSpecialBlockedEmojisList = () => {
+    const specialEmojisList = container.querySelector('#specialBlockedEmojisList');
+    specialEmojisList.innerHTML = Object.entries(this.blockedWordsManager.specialBlockedUsersEmojis || {}).map(([username, emojiIds]) => {
+        return `
+            <li style="
+                margin-bottom: 8px; 
+                display: flex; 
+                justify-content: space-between; 
+                align-items: center; 
+                padding: 8px 12px; 
+                background: white; 
+                border-radius: 4px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                border: 1px solid #f0f0f0;
+            ">
+                <span style="
+                    color: var(--text_primary); 
+                    word-break: break-all;
+                    font-size: 14px;
+                ">${username}: ${emojiIds.join(', ')}</span>
+                <button class="delete-special-emoji-btn" 
+                    data-username="${username}"
+                    style="
+                        padding: 4px 8px;
+                        background: #ff4d4f;
+                        color: white;
+                        border: none;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-size: 12px;
+                        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+                    ">删除</button>
+            </li>
+        `;
+    }).join('');
+    const deleteButtons = specialEmojisList.querySelectorAll('.delete-special-emoji-btn');
+    deleteButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const username = button.getAttribute('data-username');
+            this.blockedWordsManager.removeSpecialBlockedUserEmojis(username);
+            renderSpecialBlockedEmojisList(); // 重新渲染列表
+        });
+    });
+};
+// 添加特定用户表情屏蔽的处理函数
+const addSpecialEmojiHandler = () => {
+    const specialUserInput = container.querySelector('#specialUserEmoji');
+    const specialEmojiIdInput = container.querySelector('#specialEmojiId');
+    if (!specialUserInput || !specialEmojiIdInput) {
+        console.error('未找到输入元素');
+        return;
+    }
+    const username = specialUserInput.value.trim();
+    const emojiId = parseInt(specialEmojiIdInput.value.trim());
+    if (!username) {
+        showToast('请输入用户名', 'error');
+        return;
+    }
+    if (isNaN(emojiId)) {
+        showToast('请输入有效的表情ID', 'error');
+        return;
+    }
+    // 添加特定用户的表情屏蔽
+    const result = this.blockedWordsManager.addSpecialBlockedUserEmoji(username, emojiId);
+    if (result) {
+        // 清空输入框
+        specialUserInput.value = '';
+        specialEmojiIdInput.value = '';
+        // 重新渲染特定用户表情屏蔽列表
+        renderSpecialBlockedEmojisList();
+    }
+};
+// 初始渲染特定用户表情屏蔽列表
+renderSpecialBlockedEmojisList();
+            // 添加表情的处理函数
+            const addEmoji = () => {
+                const emojiInput = container.querySelector('#newBlockEmoji');
+                const emojiId = parseInt(emojiInput.value.trim());
+
+                if (!isNaN(emojiId)) {
+                    this.blockedWordsManager.addEmoji(emojiId);
+                    emojiInput.value = '';
+                    renderEmojisList();
+                } else {
+                    showToast('请输入有效的表情ID', 'error');
+                }
+            };
+            renderEmojisList();
+            // 绑定添加表情按钮事件
+            const addSpecialEmojiBtn = container.querySelector('#addSpecialEmojiBtn');
+            if (addSpecialEmojiBtn) {
+                addSpecialEmojiBtn.addEventListener('click', addSpecialEmojiHandler);
+            }
+            // 初始渲染表情列表
+            renderEmojisList();
         }
     }
     let messageBlocker = null;
