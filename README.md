@@ -19,6 +19,8 @@
 
 2.然后在该路径下以记事本方式打开LiteloaderQQNT\plugins\message_blocker\src\renderer.js
 
+![QQ_1731315348067](https://github.com/user-attachments/assets/7fe364dc-5755-4c9c-bbc9-e6ad98498344)
+
 3. 仿照默认的样例添加需要屏蔽的关键词
 
 ![3420a0fe6c8608ed92781cfb93d9b31f](https://github.com/user-attachments/assets/0d074c22-a066-4988-a52e-76b2a72e113c)
