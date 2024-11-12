@@ -4,7 +4,7 @@
     "name": "MessageBlocker",
     "slug": "message_blocker",
     "description": "消息屏蔽插件",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "authors": [
         {
             "name": "ele",
