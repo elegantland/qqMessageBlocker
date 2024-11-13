@@ -1,11 +1,12 @@
 // 默认屏蔽词列表
 const DEFAULT_BLOCKED_WORDS = [
     '测试111',
-
+    '/w',
+    '@AL_1S'
 ];
 // 默认特殊屏蔽用户配置
 const DEFAULT_SPECIAL_BLOCKED_USERS = {
-    'AL': ['@', '您'],
+    'AL_1S': ['@', '您', '其他bot'],
     '儒雅': ['3', '多条件'],
     '测试用户2': ['屏蔽词A', '屏蔽词B', '', ''],
 
@@ -20,6 +21,12 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
     //以滑稽表情和暴筋表情为例子
     //'儒雅' = [178，146];
 };
+// 在默认配置中添加需要屏蔽的图片特征
+const DEFAULT_BLOCKED_IMAGES = [
+    'c5fae3c49a465588def54e36af3003f8.jpg',
+    '99205df846cac4d7d680997a0ed56a88.jpg' // 这个是示例中第二张图的文件名
+    // 可以添加更多需要屏蔽的图片特征
+];
 (function () {
     // 屏蔽词管理类
     class BlockedWordsManager {
@@ -29,6 +36,55 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
             this.blockedEmojis = this.loadBlockedEmojis() || [];
             this.specialBlockedUsers = this.loadSpecialBlockedUsers() || {};
             this.specialBlockedUsersEmojis = this.loadSpecialBlockedUsersEmojis() || {};
+            this.blockedImages = this.loadBlockedImages() || DEFAULT_BLOCKED_IMAGES;
+        }
+        loadBlockedImages() {
+            const savedImages = localStorage.getItem('blockedImages');
+            return savedImages ? JSON.parse(savedImages) : DEFAULT_BLOCKED_IMAGES;
+        }
+        saveBlockedImages() {
+            localStorage.setItem('blockedImages', JSON.stringify(this.blockedImages));
+        }
+
+        addBlockedImage(imageIdentifier) {
+            // 如果输入的是完整路径，只保留文件名部分
+            const fileName = imageIdentifier.split('/').pop();
+            console.log('Adding blocked image:', fileName);
+
+            if (!this.blockedImages.includes(fileName)) {
+                this.blockedImages.push(fileName);
+                this.saveBlockedImages();
+                this.reprocessMessages();
+                return true;
+            }
+            return false;
+        }
+        // 检查是否是需要屏蔽的图片
+        isBlockedImage(element) {
+            if (!element) return false;
+            const imageElement = element.querySelector('.pic-element img') ||
+                element.querySelector('img[data-role="pic"]');
+            if (!imageElement) return false;
+
+            const imagePath = imageElement.getAttribute('src') ||
+                imageElement.getAttribute('data-path') ||
+                imageElement.getAttribute('data-src') || '';
+
+            console.log('Checking image path:', imagePath);
+
+            // 从完整路径中提取文件名
+            const fileName = imagePath.split('/').pop(); // 获取路径最后一部分（文件名）
+            console.log('Extracted file name:', fileName);
+
+            // 检查是否包含需要屏蔽的图片特征
+            const isBlocked = this.blockedImages.some(blockedImage => {
+                const matches = fileName.includes(blockedImage);
+                console.log(`Checking if ${fileName} matches ${blockedImage}:`, matches);
+                return matches;
+            });
+
+            console.log('Final blocking result:', isBlocked);
+            return isBlocked;
         }
         loadBlockedWords() {
             const savedWords = localStorage.getItem('blockedWords');
@@ -119,15 +175,12 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
             try {
                 // 选择所有消息容器
                 const messageContainers = document.querySelectorAll('div.message-container');
-
                 messageContainers.forEach(element => {
                     const usernameElement = element.querySelector('.avatar-span[aria-label]');
                     const messageContentElement = element.querySelector('.text-element .text-normal');
-
                     if (usernameElement && messageContentElement) {
                         const username = usernameElement.getAttribute('aria-label');
                         const message = messageContentElement.textContent.trim();
-
                         // 使用 isMessageBlocked 方法检查是否需要屏蔽
                         if (this.isMessageBlocked(username, message)) {
                             element.style.display = 'none';
@@ -137,7 +190,6 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
                         }
                     }
                 });
-
                 console.log('消息重新处理完成');
             } catch (error) {
                 console.error('重新处理消息时发生错误:', error);
@@ -146,7 +198,6 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
         saveBlockedWords() {
             localStorage.setItem('blockedWords', JSON.stringify(this.blockedWords));
         }
-
         addWord(word) {
             if (!this.blockedWords.includes(word)) {
                 this.blockedWords.push(word);
@@ -157,7 +208,6 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
             }
             return false;
         }
-
         removeWord(word) {
             const index = this.blockedWords.indexOf(word);
             if (index > -1) {
@@ -167,7 +217,6 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
             }
             return false;
         }
-
         getWords() {
             return this.blockedWords;
         }
@@ -248,20 +297,25 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
             }
             return false;
         }
-        isMessageBlocked(username, message, emojiIds) {
+        isMessageBlocked(username, message, emojiIds, element) {
+            // 首先检查图片
+            if (element && this.isBlockedImage(element)) {
+                console.log('Blocked image detected:', element);
+                return true;
+            }
             // 1. 统一检查屏蔽词和@提及
             const hasBlockedWord = this.blockedWords.some(word => {
                 const matched = message.includes(word);
                 console.log(`Checking "${word}" against "${message}":`, matched);
                 return matched;
             });
-        
+
             // 2. 检查特殊用户关键词
             const specialUserKeywords = this.specialBlockedUsers[username] || [];
             const hasSpecialBlockedUserKeyword = specialUserKeywords.some(keyword =>
                 message.toLowerCase().includes(keyword.toLowerCase().trim())
             );
-        
+
             // 3. 检查被@用户是否在特殊屏蔽列表中
             let hasBlockedAtUser = false;
             const atMatch = message.match(/@(\w+)/);
@@ -271,29 +325,29 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
                     hasBlockedAtUser = true;
                 }
             }
-        
+
             // 4. 检查表情屏蔽
             const checkEmojiBlocked = (ids) => {
                 if (!ids || ids.length === 0) return false;
-        
+
                 return ids.some(id => {
                     const numId = Number(id);
                     const isGlobalBlocked = this.blockedEmojis.includes(numId);
                     const isUserSpecificBlocked =
                         (this.specialBlockedUsersEmojis[username] || []).includes(numId);
-        
+
                     console.log(`检查表情 ${numId}:`, {
                         isGlobalBlocked,
                         isUserSpecificBlocked,
                         globalBlockedEmojis: this.blockedEmojis,
                         userSpecificBlockedEmojis: this.specialBlockedUsersEmojis[username]
                     });
-        
+
                     return isGlobalBlocked || isUserSpecificBlocked;
                 });
             };
             const hasBlockedEmoji = checkEmojiBlocked(emojiIds);
-        
+
             // 调试日志
             console.log('屏蔽检查结果:', {
                 hasBlockedWord,
@@ -306,9 +360,9 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
                 globalBlockedEmojis: this.blockedEmojis,
                 userSpecificBlockedEmojis: this.specialBlockedUsersEmojis[username]
             });
-        
+
             // 返回所有检查结果的组合
-            return hasBlockedWord || hasSpecialBlockedUserKeyword  || hasBlockedEmoji;
+            return hasBlockedWord || hasSpecialBlockedUserKeyword || hasBlockedEmoji;
         }
         addBlockedMention(username) {
             const mention = `@${username}`;
@@ -323,17 +377,17 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
     function showToast(message, type = 'success') {
         const toast = document.createElement('div');
         toast.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background-color: ${type === 'success' ? '#52c41a' : '#ff4d4f'};
-            color: white;
-            padding: 10px 20px;
-            border-radius: 4px;
-            z-index: 9999;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            transition: all 0.3s ease;
-        `;
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background-color: ${type === 'success' ? '#52c41a' : '#ff4d4f'};
+    color: white;
+    padding: 10px 20px;
+    border-radius: 4px;
+    z-index: 9999;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    `;
         toast.textContent = message;
         document.body.appendChild(toast);
         setTimeout(() => {
@@ -363,47 +417,47 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
             let username = '';
             let message = '';
             let emojiIds = [];
-        
+
             // 1. 找到最外层的消息容器
             const rootMessageContainer = element.closest('.message-container');
             if (!rootMessageContainer) {
                 console.log('Could not find root message container');
                 return;
             }
-        
+
             // 2. 提取消息的完整内容
             let fullMessage = '';
-            
+
             // 提取@部分
             const atElement = rootMessageContainer.querySelector('.text-element--at');
             if (atElement) {
                 fullMessage += atElement.textContent.trim();
             }
-        
+
             // 提取普通文本部分
             const normalTextElements = rootMessageContainer.querySelectorAll('.text-normal');
             normalTextElements.forEach(el => {
                 fullMessage += ' ' + el.textContent.trim();
             });
-        
+
             // 提取 markdown 内容
             const markdownElement = rootMessageContainer.querySelector('.markdown-element');
             if (markdownElement) {
                 fullMessage += ' ' + markdownElement.textContent.trim();
             }
-        
+
             message = fullMessage.trim();
-        
+
             // 3. 提取用户名
             const userNameElement = rootMessageContainer.querySelector('.user-name .text-ellipsis');
             const avatarElement = rootMessageContainer.querySelector('.avatar-span');
-            
+
             if (userNameElement) {
                 username = userNameElement.textContent.trim();
             } else if (avatarElement && avatarElement.getAttribute('aria-label')) {
                 username = avatarElement.getAttribute('aria-label').trim();
             }
-        
+
             // 4. 提取表情ID
             const extractEmojiId = (emojiElement) => {
                 try {
@@ -412,7 +466,7 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
                     if (dataFaceIndex) {
                         return parseInt(dataFaceIndex);
                     }
-        
+
                     // 尝试从 src 属性提取
                     const src = emojiElement.getAttribute('src');
                     if (src) {
@@ -425,7 +479,7 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
                             return parseInt(pathMatch[1]);
                         }
                     }
-        
+
                     // 检查类名
                     const classList = emojiElement.classList;
                     for (let cls of classList) {
@@ -438,12 +492,12 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
                     return null;
                 }
             };
-        
+
             // 提取所有表情ID
             const emojiElements = rootMessageContainer.querySelectorAll(
                 '.face-element__icon[data-face-index], .face-element__icon[src*="/Emoji/"]'
             );
-        
+
             emojiIds = [];
             emojiElements.forEach(emojiElement => {
                 const emojiId = extractEmojiId(emojiElement);
@@ -452,7 +506,7 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
                     console.log('成功提取表情ID:', emojiId);
                 }
             });
-        
+
             // 5. 详细的调试日志
             console.log('处理消息:', {
                 username,
@@ -462,27 +516,29 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
                 fullMessageContent: message,
                 elementHTML: rootMessageContainer.outerHTML
             });
-        
+
             // 6. 检查是否需要屏蔽
-            if (username || message) {  // 放宽条件，只要有用户名或消息内容就检查
+            if (username || message || rootMessageContainer.querySelector('.pic-element')) { // 放宽条件，只要有用户名或消息内容就检查
                 const shouldBlock = this.blockedWordsManager.isMessageBlocked(
                     username,
                     message,
-                    emojiIds
+                    emojiIds,
+                    rootMessageContainer
                 );
-        
+
                 if (shouldBlock) {
                     // 屏蔽整个消息容器
                     rootMessageContainer.style.display = 'none';
-                    console.log('已屏蔽消息:', {
+                    console.log('Blocked message:', {
                         username,
                         message,
-                        emojiIds
+                        emojiIds,
+                        isImage: !!rootMessageContainer.querySelector('.pic-element')
                     });
                     return true;
                 }
             }
-        
+
             return false;
         }
         setupObserver() {
@@ -505,7 +561,7 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
                     }
                 });
             });
-        
+
             // 观察整个文档
             observer.observe(document.body, {
                 childList: true,
@@ -525,13 +581,13 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
                     navItem.setAttribute('bf-label-inner', 'true');
                     navItem.setAttribute('data-slug', 'word-blocker');
                     navItem.innerHTML = `
-                        <i data-v-357b03a8="" data-v-282aeb44="" class="q-svg-icon q-icon icon vue-component" style="width: 20px; height: 20px; --340fd034: inherit;">
-                            <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM4 12c0-4.42 3.58-8 8-8 1.85 0 3.55.63 4.9 1.69L5.69 16.9C4.63 15.55 4 13.85 4 12zm8 8c-1.85 0-3.55-.63-4.9-1.69L18.31 7.1C19.37 8.45 20 10.15 20 12c0 4.42-3.58 8-8 8z"/>
-                            </svg>
-                        </i>
-                        <div data-v-282aeb44="" class="name">屏蔽词管理</div>
-                    `;
+    <i data-v-357b03a8="" data-v-282aeb44="" class="q-svg-icon q-icon icon vue-component" style="width: 20px; height: 20px; --340fd034: inherit;">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM4 12c0-4.42 3.58-8 8-8 1.85 0 3.55.63 4.9 1.69L5.69 16.9C4.63 15.55 4 13.85 4 12zm8 8c-1.85 0-3.55-.63-4.9-1.69L18.31 7.1C19.37 8.45 20 10.15 20 12c0 4.42-3.58 8-8 8z" />
+        </svg>
+    </i>
+    <div data-v-282aeb44="" class="name">屏蔽词管理</div>
+    `;
                     navItem.addEventListener('click', () => this.showBlockedWordsModal());
                     navBar.appendChild(navItem);
                 }
@@ -543,49 +599,152 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
             scrollView.innerHTML = '';
             const container = document.createElement('div');
             container.style.cssText = `
-                padding: 16px;
-                background: var(--bg_bottom_standard);
-                color: var(--text_primary);
-            `;
+    padding: 16px;
+    background: var(--bg_bottom_standard);
+    color: var(--text_primary);
+    `;
             container.innerHTML = `
-            <div style="
+    <div style="
+                    background: white;
+                    border-radius: 8px;
+                    padding: 16px;
+                    margin-bottom: 16px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                ">
+        <h2 style="
+                        margin-bottom: 16px; 
+                        color: var(--text_primary);
+                        font-size: 16px;
+                        font-weight: 500;
+                    ">屏蔽词管理</h2>
+        <h2 style="
+                        margin-bottom: 16px; 
+                        color: var(--text_primary);
+                        font-size: 16px;
+                        font-weight: 500;
+                    ">(在这个页面添加时有概率数据丢失，建议去renderer.js修改)</h2>
+        <div style="
+                        display: flex;
+                        gap: 8px;
+                        margin-bottom: 16px;
+                    ">
+            <input type="text" id="newBlockWord" placeholder="输入要屏蔽的词" style="
+                                flex: 1; 
+                                padding: 8px 12px;
+                                background: white;
+                                color: var(--text_primary);
+                                border: 1px solid #e0e0e0;
+                                border-radius: 4px;
+                                font-size: 14px;
+                                box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+                            ">
+            <button id="addWordBtn" style="
+                                padding: 8px 16px;
+                                background: var(--brand_standard);
+                                color: white;
+                                border: none;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                font-size: 14px;
+                                box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+                            ">添加</button>
+        </div>
+        <ul id="blockedWordsList" style="
+                        list-style: none; 
+                        padding: 0; 
+                        margin-bottom: 16px;
+                        max-height: 200px;
+                        overflow-y: auto;
+                    "></ul>
+    </div>
+    <div style="
+                    background: white;
+                    border-radius: 8px;
+                    padding: 16px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                ">
+        <h2 style="
+                        margin-bottom: 16px; 
+                        color: var(--text_primary);
+                        font-size: 16px;
+                        font-weight: 500;
+                    ">屏蔽用户管理</h2>
+    
+        <div style="
+                        display: flex;
+                        gap: 8px;
+                        margin-bottom: 16px;
+                    ">
+            <input type="text" id="specialUser" placeholder="输入屏蔽用户" style="
+                                flex: 1; 
+                                padding: 8px 12px;
+                                background: white;
+                                color: var(--text_primary);
+                                border: 1px solid #e0e0e0;
+                                border-radius: 4px;
+                                font-size: 14px;
+                                box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+                            ">
+            <input type="text" id="specialKeywords" placeholder="输入屏蔽词" style="
+                                flex: 1; 
+                                padding: 8px 12px;
+                                background: white;
+                                color: var(--text_primary);
+                                border: 1px solid #e0e0e0;
+                                border-radius: 4px;
+                                font-size: 14px;
+                                box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+                            ">
+            <button id="addSpecialUserBtn" style="
+                                padding: 8px 16px;
+                                background: var(--brand_standard);
+                                color: white;
+                                border: none;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                font-size: 14px;
+                                box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+                            ">添加</button>
+        </div>
+        <ul id="specialBlockedUsersList" style="
+                        list-style: none; 
+                        padding: 0; 
+                        margin-bottom: 16px;
+                        max-height: 200px;
+                        overflow-y: auto;
+                    "></ul>
+    </div>
+    `;
+            const imageBlockSection = `
+    <div style="
                 background: white;
                 border-radius: 8px;
                 padding: 16px;
-                margin-bottom: 16px;
+                margin-top: 16px;
                 box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             ">
-                <h2 style="
-                    margin-bottom: 16px; 
+        <h2 style="
+                    margin-bottom: 16px;
                     color: var(--text_primary);
                     font-size: 16px;
                     font-weight: 500;
-                ">屏蔽词管理</h2>
-                <h2 style="
-                    margin-bottom: 16px; 
-                    color: var(--text_primary);
-                    font-size: 16px;
-                    font-weight: 500;
-                ">(在这个页面添加时有概率数据丢失，建议去renderer.js修改)</h2>
-                <div style="
+                ">图片屏蔽管理</h2>
+    
+        <div style="
                     display: flex;
                     gap: 8px;
                     margin-bottom: 16px;
                 ">
-                    <input type="text" id="newBlockWord"
-                        placeholder="输入要屏蔽的词"
-                        style="
-                            flex: 1; 
+            <input type="text" id="newBlockedImage" placeholder="输入要屏蔽的图片特征" style="
+                            flex: 1;
                             padding: 8px 12px;
                             background: white;
                             color: var(--text_primary);
                             border: 1px solid #e0e0e0;
                             border-radius: 4px;
                             font-size: 14px;
-                            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
                         ">
-                    <button id="addWordBtn"
-                        style="
+            <button id="addBlockedImageBtn" style="
                             padding: 8px 16px;
                             background: var(--brand_standard);
                             color: white;
@@ -593,117 +752,76 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
                             border-radius: 4px;
                             cursor: pointer;
                             font-size: 14px;
-                            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
                         ">添加</button>
-                </div>
-                <ul id="blockedWordsList" style="
-                    list-style: none; 
-                    padding: 0; 
+        </div>
+        <ul id="blockedImagesList" style="
+                    list-style: none;
+                    padding: 0;
                     margin-bottom: 16px;
                     max-height: 200px;
                     overflow-y: auto;
                 "></ul>
-            </div>
-            <div style="
-                background: white;
-                border-radius: 8px;
-                padding: 16px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            ">
-                <h2 style="
-                    margin-bottom: 16px; 
-                    color: var(--text_primary);
-                    font-size: 16px;
-                    font-weight: 500;
-                ">屏蔽用户管理</h2>
-                
-                <div style="
-                    display: flex;
-                    gap: 8px;
-                    margin-bottom: 16px;
-                ">
-                    <input type="text" id="specialUser"
-                        placeholder="输入屏蔽用户"
-                        style="
-                            flex: 1; 
-                            padding: 8px 12px;
-                            background: white;
-                            color: var(--text_primary);
-                            border: 1px solid #e0e0e0;
-                            border-radius: 4px;
-                            font-size: 14px;
-                            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-                        ">
-                    <input type="text" id="specialKeywords"
-                        placeholder="输入屏蔽词"
-                        style="
-                            flex: 1; 
-                            padding: 8px 12px;
-                            background: white;
-                            color: var(--text_primary);
-                            border: 1px solid #e0e0e0;
-                            border-radius: 4px;
-                            font-size: 14px;
-                            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-                        ">
-                    <button id="addSpecialUserBtn"
-                        style="
-                            padding: 8px 16px;
-                            background: var(--brand_standard);
-                            color: white;
-                            border: none;
-                            border-radius: 4px;
-                            cursor: pointer;
-                            font-size: 14px;
-                            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-                        ">添加</button>
-                </div>
-                <ul id="specialBlockedUsersList" style="
-                    list-style: none; 
-                    padding: 0; 
-                    margin-bottom: 16px;
-                    max-height: 200px;
-                    overflow-y: auto;
-                "></ul>
-            </div>
-        `;
+    </div>`;
 
+            container.innerHTML += imageBlockSection;
+
+            // 添加图片屏蔽列表渲染逻辑
+            const renderBlockedImagesList = () => {
+                const imagesList = container.querySelector('#blockedImagesList');
+                imagesList.innerHTML = this.blockedWordsManager.blockedImages.map(image => `
+    <li style="
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 8px;
+                        border-bottom: 1px solid #eee;
+                    ">
+        <span>${image}</span>
+        <button class="delete-image-btn" data-image="${image}" style="
+                                padding: 4px 8px;
+                                background: #ff4d4f;
+                                color: white;
+                                border: none;
+                                border-radius: 4px;
+                                cursor: pointer;
+                            ">删除</button>
+    </li>
+    `).join('');
+            };
             scrollView.appendChild(container);
             const renderWordsList = () => {
                 const wordsList = container.querySelector('#blockedWordsList');
                 wordsList.innerHTML = this.blockedWordsManager.getWords().map(word => {
                     const encodedWord = word.replace(/'/g, '\\\'').replace(/"/g, '\\"');
                     return `
-                        <li style="
-                            margin-bottom: 8px; 
-                            display: flex; 
-                            justify-content: space-between; 
-                            align-items: center; 
-                            padding: 8px 12px; 
-                            background: white; 
-                            border-radius: 4px;
-                            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                            border: 1px solid #f0f0f0;
-                        ">
-                            <span style="
-                                color: var(--text_primary); 
-                                word-break: break-all;
-                                font-size: 14px;
-                            ">${word}</span>
-                            <button class="delete-word-btn" 
-                                data-word="${encodedWord}"
-                                style="
-                                    padding: 4px 8px;
-                                    background: #ff4d4f;
-                                    color: white;
-                                    border: none;
-                                    border-radius: 4px;
-                                    cursor: pointer;
-                                    font-size: 12px;
-                                    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-                                ">删除</button>
-                        </li>
-                    `;
+    <li style="
+                                margin-bottom: 8px; 
+                                display: flex; 
+                                justify-content: space-between; 
+                                align-items: center; 
+                                padding: 8px 12px; 
+                                background: white; 
+                                border-radius: 4px;
+                                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                                border: 1px solid #f0f0f0;
+                            ">
+        <span style="
+                                    color: var(--text_primary); 
+                                    word-break: break-all;
+                                    font-size: 14px;
+                                ">${word}</span>
+        <button class="delete-word-btn" data-word="${encodedWord}" style="
+                                        padding: 4px 8px;
+                                        background: #ff4d4f;
+                                        color: white;
+                                        border: none;
+                                        border-radius: 4px;
+                                        cursor: pointer;
+                                        font-size: 12px;
+                                        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+                                    ">删除</button>
+    </li>
+    `;
                 }).join('');
                 const deleteButtons = wordsList.querySelectorAll('.delete-word-btn');
                 deleteButtons.forEach(button => {
@@ -718,33 +836,31 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
                 const specialUsersList = container.querySelector('#specialBlockedUsersList');
                 specialUsersList.innerHTML = Object.entries(this.blockedWordsManager.specialBlockedUsers || {}).map(([username, keywords]) => {
                     return `
-                <li style="
-                    margin-bottom: 8px; 
-                    display: flex; 
-                    justify-content: space-between; 
-                    align-items: center; 
-                    padding: 8px 12px; 
-                    background: white; 
-                    border-bottom: 1px solid #f0f0f0;
-                ">
-                    <span style="
-                        color: var(--text_primary); 
-                        word-break: break-all;
-                        font-size: 14px;
-                    ">${username}: ${keywords.join(', ')}</span>
-                            <button class="delete-special-user-btn" 
-                                data-username="${username}"
-                                style="
-                                    padding: 4px 8px;
-                                    background: #ff4d4f;
-                                    color: white;
-                                    border: none;
-                                    border-radius: 4px;
-                                    cursor: pointer;
-                                    font-size: 12px;
-                                ">删除</button>
-                        </li>
-                    `;
+    <li style="
+                        margin-bottom: 8px; 
+                        display: flex; 
+                        justify-content: space-between; 
+                        align-items: center; 
+                        padding: 8px 12px; 
+                        background: white; 
+                        border-bottom: 1px solid #f0f0f0;
+                    ">
+        <span style="
+                            color: var(--text_primary); 
+                            word-break: break-all;
+                            font-size: 14px;
+                        ">${username}: ${keywords.join(', ')}</span>
+        <button class="delete-special-user-btn" data-username="${username}" style="
+                                        padding: 4px 8px;
+                                        background: #ff4d4f;
+                                        color: white;
+                                        border: none;
+                                        border-radius: 4px;
+                                        cursor: pointer;
+                                        font-size: 12px;
+                                    ">删除</button>
+    </li>
+    `;
                 }).join('');
                 const deleteButtons = specialUsersList.querySelectorAll('.delete-special-user-btn');
                 deleteButtons.forEach(button => {
@@ -757,6 +873,7 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
             };
             renderWordsList();
             renderSpecialUsersList();
+            renderBlockedImagesList();
             const input = container.querySelector('#newBlockWord');
             const addWordBtn = container.querySelector('#addWordBtn');
 
@@ -811,121 +928,113 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
                 addSpecialUserBtn.addEventListener('click', addSpecialUserHandler);
             }
             const emojiManageBlock = `
-            <div style="
-                background: white;
-                border-radius: 8px;
-                padding: 16px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                margin-top: 16px;
-            ">
-                <h2 style="
-                    margin-bottom: 16px; 
-                    color: var(--text_primary);
-                    font-size: 16px;
-                    font-weight: 500;
-                ">表情屏蔽管理</h2>
-                
-                <div style="
-                    display: flex;
-                    gap: 8px;
-                    margin-bottom: 16px;
-                ">
-                    <input type="text" id="newBlockEmoji"
-                        placeholder="输入要屏蔽的表情ID"
-                        style="
-                            flex: 1; 
-                            padding: 8px 12px;
-                            background: white;
-                            color: var(--text_primary);
-                            border: 1px solid #e0e0e0;
-                            border-radius: 4px;
-                            font-size: 14px;
-                            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-                        ">
-                    <button id="addEmojiBtn"
-                        style="
-                            padding: 8px 16px;
-                            background: var(--brand_standard);
-                            color: white;
-                            border: none;
-                            border-radius: 4px;
-                            cursor: pointer;
-                            font-size: 14px;
-                            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-                        ">添加</button>
-                </div>
-                <ul id="blockedEmojisList" style="
-                    list-style: none; 
-                    padding: 0; 
-                    margin-bottom: 16px;
-                    max-height: 200px;
-                    overflow-y: auto;
-                "></ul>
-            </div>
     <div style="
-        background: white;
-        border-radius: 8px;
-        padding: 16px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        margin-top: 16px;
-    ">
+                    background: white;
+                    border-radius: 8px;
+                    padding: 16px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                    margin-top: 16px;
+                ">
         <h2 style="
-            margin-bottom: 16px; 
-            color: var(--text_primary);
-            font-size: 16px;
-            font-weight: 500;
-        ">特定用户表情屏蔽管理</h2>
-        
+                        margin-bottom: 16px; 
+                        color: var(--text_primary);
+                        font-size: 16px;
+                        font-weight: 500;
+                    ">表情屏蔽管理</h2>
+    
         <div style="
-            display: flex;
-            gap: 8px;
-            margin-bottom: 16px;
+                        display: flex;
+                        gap: 8px;
+                        margin-bottom: 16px;
+                    ">
+            <input type="text" id="newBlockEmoji" placeholder="输入要屏蔽的表情ID" style="
+                                flex: 1; 
+                                padding: 8px 12px;
+                                background: white;
+                                color: var(--text_primary);
+                                border: 1px solid #e0e0e0;
+                                border-radius: 4px;
+                                font-size: 14px;
+                                box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+                            ">
+            <button id="addEmojiBtn" style="
+                                padding: 8px 16px;
+                                background: var(--brand_standard);
+                                color: white;
+                                border: none;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                font-size: 14px;
+                                box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+                            ">添加</button>
+        </div>
+        <ul id="blockedEmojisList" style="
+                        list-style: none; 
+                        padding: 0; 
+                        margin-bottom: 16px;
+                        max-height: 200px;
+                        overflow-y: auto;
+                    "></ul>
+    </div>
+    <div style="
+            background: white;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-top: 16px;
         ">
-            <input type="text" id="specialUserEmoji"
-                placeholder="输入用户名"
-                style="
-                    flex: 1; 
-                    padding: 8px 12px;
-                    background: white;
-                    color: var(--text_primary);
-                    border: 1px solid #e0e0e0;
-                    border-radius: 4px;
-                    font-size: 14px;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-                ">
-            <input type="text" id="specialEmojiId"
-                placeholder="输入表情ID"
-                style="
-                    flex: 1; 
-                    padding: 8px 12px;
-                    background: white;
-                    color: var(--text_primary);
-                    border: 1px solid #e0e0e0;
-                    border-radius: 4px;
-                    font-size: 14px;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-                ">
-            <button id="addSpecialEmojiBtn"
-                style="
-                    padding: 8px 16px;
-                    background: var(--brand_standard);
-                    color: white;
-                    border: none;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    font-size: 14px;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-                ">添加</button>
+        <h2 style="
+                margin-bottom: 16px; 
+                color: var(--text_primary);
+                font-size: 16px;
+                font-weight: 500;
+            ">特定用户表情屏蔽管理</h2>
+    
+        <div style="
+                display: flex;
+                gap: 8px;
+                margin-bottom: 16px;
+            ">
+            <input type="text" id="specialUserEmoji" placeholder="输入用户名" style="
+                        flex: 1; 
+                        padding: 8px 12px;
+                        background: white;
+                        color: var(--text_primary);
+                        border: 1px solid #e0e0e0;
+                        border-radius: 4px;
+                        font-size: 14px;
+                        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+                    ">
+            <input type="text" id="specialEmojiId" placeholder="输入表情ID" style="
+                        flex: 1; 
+                        padding: 8px 12px;
+                        background: white;
+                        color: var(--text_primary);
+                        border: 1px solid #e0e0e0;
+                        border-radius: 4px;
+                        font-size: 14px;
+                        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+                    ">
+            <button id="addSpecialEmojiBtn" style="
+                        padding: 8px 16px;
+                        background: var(--brand_standard);
+                        color: white;
+                        border: none;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-size: 14px;
+                        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+                    ">添加</button>
         </div>
         <ul id="specialBlockedEmojisList" style="
-            list-style: none; 
-            padding: 0; 
-            margin-bottom: 16px;
-            max-height: 200px;
-            overflow-y: auto;
-        "></ul>
+                list-style: none; 
+                padding: 0; 
+                margin-bottom: 16px;
+                max-height: 200px;
+                overflow-y: auto;
+            "></ul>
     </div>
-`;
+    `;
             // 将表情屏蔽管理块添加到容器中
             container.innerHTML += emojiManageBlock;
             // 表情列表渲染函数
@@ -933,36 +1042,34 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
                 const emojisList = container.querySelector('#blockedEmojisList');
                 emojisList.innerHTML = this.blockedWordsManager.blockedEmojis.map(emojiId => {
                     return `
-                    <li style="
-                        margin-bottom: 8px; 
-                        display: flex; 
-                        justify-content: space-between; 
-                        align-items: center; 
-                        padding: 8px 12px; 
-                        background: white; 
-                        border-radius: 4px;
-                        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                        border: 1px solid #f0f0f0;
-                    ">
-                        <span style="
-                            color: var(--text_primary); 
-                            word-break: break-all;
-                            font-size: 14px;
-                        ">${emojiId}</span>
-                        <button class="delete-emoji-btn" 
-                            data-emoji-id="${emojiId}"
-                            style="
-                                padding: 4px 8px;
-                                background: #ff4d4f;
-                                color: white;
-                                border: none;
-                                border-radius: 4px;
-                                cursor: pointer;
-                                font-size: 12px;
-                                box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-                            ">删除</button>
-                    </li>
-                `;
+    <li style="
+                            margin-bottom: 8px; 
+                            display: flex; 
+                            justify-content: space-between; 
+                            align-items: center; 
+                            padding: 8px 12px; 
+                            background: white; 
+                            border-radius: 4px;
+                            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                            border: 1px solid #f0f0f0;
+                        ">
+        <span style="
+                                color: var(--text_primary); 
+                                word-break: break-all;
+                                font-size: 14px;
+                            ">${emojiId}</span>
+        <button class="delete-emoji-btn" data-emoji-id="${emojiId}" style="
+                                    padding: 4px 8px;
+                                    background: #ff4d4f;
+                                    color: white;
+                                    border: none;
+                                    border-radius: 4px;
+                                    cursor: pointer;
+                                    font-size: 12px;
+                                    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+                                ">删除</button>
+    </li>
+    `;
                 }).join('');
                 const deleteButtons = emojisList.querySelectorAll('.delete-emoji-btn');
                 deleteButtons.forEach(button => {
@@ -973,81 +1080,79 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
                     });
                 });
             };
-// 添加渲染特定用户表情屏蔽列表的函数
-const renderSpecialBlockedEmojisList = () => {
-    const specialEmojisList = container.querySelector('#specialBlockedEmojisList');
-    specialEmojisList.innerHTML = Object.entries(this.blockedWordsManager.specialBlockedUsersEmojis || {}).map(([username, emojiIds]) => {
-        return `
-            <li style="
-                margin-bottom: 8px; 
-                display: flex; 
-                justify-content: space-between; 
-                align-items: center; 
-                padding: 8px 12px; 
-                background: white; 
-                border-radius: 4px;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                border: 1px solid #f0f0f0;
-            ">
-                <span style="
-                    color: var(--text_primary); 
-                    word-break: break-all;
-                    font-size: 14px;
-                ">${username}: ${emojiIds.join(', ')}</span>
-                <button class="delete-special-emoji-btn" 
-                    data-username="${username}"
-                    style="
-                        padding: 4px 8px;
-                        background: #ff4d4f;
-                        color: white;
-                        border: none;
-                        border-radius: 4px;
-                        cursor: pointer;
-                        font-size: 12px;
-                        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-                    ">删除</button>
-            </li>
-        `;
-    }).join('');
-    const deleteButtons = specialEmojisList.querySelectorAll('.delete-special-emoji-btn');
-    deleteButtons.forEach(button => {
-        button.addEventListener('click', () => {
-            const username = button.getAttribute('data-username');
-            this.blockedWordsManager.removeSpecialBlockedUserEmojis(username);
-            renderSpecialBlockedEmojisList(); // 重新渲染列表
-        });
-    });
-};
-// 添加特定用户表情屏蔽的处理函数
-const addSpecialEmojiHandler = () => {
-    const specialUserInput = container.querySelector('#specialUserEmoji');
-    const specialEmojiIdInput = container.querySelector('#specialEmojiId');
-    if (!specialUserInput || !specialEmojiIdInput) {
-        console.error('未找到输入元素');
-        return;
-    }
-    const username = specialUserInput.value.trim();
-    const emojiId = parseInt(specialEmojiIdInput.value.trim());
-    if (!username) {
-        showToast('请输入用户名', 'error');
-        return;
-    }
-    if (isNaN(emojiId)) {
-        showToast('请输入有效的表情ID', 'error');
-        return;
-    }
-    // 添加特定用户的表情屏蔽
-    const result = this.blockedWordsManager.addSpecialBlockedUserEmoji(username, emojiId);
-    if (result) {
-        // 清空输入框
-        specialUserInput.value = '';
-        specialEmojiIdInput.value = '';
-        // 重新渲染特定用户表情屏蔽列表
-        renderSpecialBlockedEmojisList();
-    }
-};
-// 初始渲染特定用户表情屏蔽列表
-renderSpecialBlockedEmojisList();
+            // 添加渲染特定用户表情屏蔽列表的函数
+            const renderSpecialBlockedEmojisList = () => {
+                const specialEmojisList = container.querySelector('#specialBlockedEmojisList');
+                specialEmojisList.innerHTML = Object.entries(this.blockedWordsManager.specialBlockedUsersEmojis || {}).map(([username, emojiIds]) => {
+                    return `
+    <li style="
+                    margin-bottom: 8px; 
+                    display: flex; 
+                    justify-content: space-between; 
+                    align-items: center; 
+                    padding: 8px 12px; 
+                    background: white; 
+                    border-radius: 4px;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                    border: 1px solid #f0f0f0;
+                ">
+        <span style="
+                        color: var(--text_primary); 
+                        word-break: break-all;
+                        font-size: 14px;
+                    ">${username}: ${emojiIds.join(', ')}</span>
+        <button class="delete-special-emoji-btn" data-username="${username}" style="
+                            padding: 4px 8px;
+                            background: #ff4d4f;
+                            color: white;
+                            border: none;
+                            border-radius: 4px;
+                            cursor: pointer;
+                            font-size: 12px;
+                            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+                        ">删除</button>
+    </li>
+    `;
+                }).join('');
+                const deleteButtons = specialEmojisList.querySelectorAll('.delete-special-emoji-btn');
+                deleteButtons.forEach(button => {
+                    button.addEventListener('click', () => {
+                        const username = button.getAttribute('data-username');
+                        this.blockedWordsManager.removeSpecialBlockedUserEmojis(username);
+                        renderSpecialBlockedEmojisList(); // 重新渲染列表
+                    });
+                });
+            };
+            // 添加特定用户表情屏蔽的处理函数
+            const addSpecialEmojiHandler = () => {
+                const specialUserInput = container.querySelector('#specialUserEmoji');
+                const specialEmojiIdInput = container.querySelector('#specialEmojiId');
+                if (!specialUserInput || !specialEmojiIdInput) {
+                    console.error('未找到输入元素');
+                    return;
+                }
+                const username = specialUserInput.value.trim();
+                const emojiId = parseInt(specialEmojiIdInput.value.trim());
+                if (!username) {
+                    showToast('请输入用户名', 'error');
+                    return;
+                }
+                if (isNaN(emojiId)) {
+                    showToast('请输入有效的表情ID', 'error');
+                    return;
+                }
+                // 添加特定用户的表情屏蔽
+                const result = this.blockedWordsManager.addSpecialBlockedUserEmoji(username, emojiId);
+                if (result) {
+                    // 清空输入框
+                    specialUserInput.value = '';
+                    specialEmojiIdInput.value = '';
+                    // 重新渲染特定用户表情屏蔽列表
+                    renderSpecialBlockedEmojisList();
+                }
+            };
+            // 初始渲染特定用户表情屏蔽列表
+            renderSpecialBlockedEmojisList();
             // 添加表情的处理函数
             const addEmoji = () => {
                 const emojiInput = container.querySelector('#newBlockEmoji');
@@ -1080,7 +1185,5 @@ renderSpecialBlockedEmojisList();
         document.addEventListener('DOMContentLoaded', initialize);
     } else {
         initialize();
-    }
-})();
     }
 })();
