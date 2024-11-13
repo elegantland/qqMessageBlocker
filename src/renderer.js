@@ -248,47 +248,57 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
             }
             return false;
         }
-
         isMessageBlocked(username, message, emojiIds) {
-            // 检查文字屏蔽
-            const hasBlockedWord = this.blockedWords.some(word =>
-                message.toLowerCase().includes(word.toLowerCase())
-            );
-            // 检查特殊用户关键词
+            // 1. 统一检查屏蔽词和@提及
+            const hasBlockedWord = this.blockedWords.some(word => {
+                const matched = message.includes(word);
+                console.log(`Checking "${word}" against "${message}":`, matched);
+                return matched;
+            });
+        
+            // 2. 检查特殊用户关键词
             const specialUserKeywords = this.specialBlockedUsers[username] || [];
             const hasSpecialBlockedUserKeyword = specialUserKeywords.some(keyword =>
                 message.toLowerCase().includes(keyword.toLowerCase().trim())
             );
-            // 检查表情屏蔽
+        
+            // 3. 检查被@用户是否在特殊屏蔽列表中
+            let hasBlockedAtUser = false;
+            const atMatch = message.match(/@(\w+)/);
+            if (atMatch) {
+                const atUsername = atMatch[1];
+                if (this.specialBlockedUsers[atUsername]) {
+                    hasBlockedAtUser = true;
+                }
+            }
+        
+            // 4. 检查表情屏蔽
             const checkEmojiBlocked = (ids) => {
                 if (!ids || ids.length === 0) return false;
-
+        
                 return ids.some(id => {
-                    // 确保 id 是数字，并进行严格匹配
                     const numId = Number(id);
-
-                    // 检查全局屏蔽表情
                     const isGlobalBlocked = this.blockedEmojis.includes(numId);
-
-                    // 检查针对特定用户的表情屏蔽
                     const isUserSpecificBlocked =
                         (this.specialBlockedUsersEmojis[username] || []).includes(numId);
-
+        
                     console.log(`检查表情 ${numId}:`, {
                         isGlobalBlocked,
                         isUserSpecificBlocked,
                         globalBlockedEmojis: this.blockedEmojis,
                         userSpecificBlockedEmojis: this.specialBlockedUsersEmojis[username]
                     });
-
+        
                     return isGlobalBlocked || isUserSpecificBlocked;
                 });
             };
             const hasBlockedEmoji = checkEmojiBlocked(emojiIds);
-            // 详细日志
+        
+            // 调试日志
             console.log('屏蔽检查结果:', {
                 hasBlockedWord,
                 hasSpecialBlockedUserKeyword,
+                hasBlockedAtUser,
                 hasBlockedEmoji,
                 username,
                 message,
@@ -296,7 +306,18 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
                 globalBlockedEmojis: this.blockedEmojis,
                 userSpecificBlockedEmojis: this.specialBlockedUsersEmojis[username]
             });
-            return hasBlockedWord || hasSpecialBlockedUserKeyword || hasBlockedEmoji;
+        
+            // 返回所有检查结果的组合
+            return hasBlockedWord || hasSpecialBlockedUserKeyword  || hasBlockedEmoji;
+        }
+        addBlockedMention(username) {
+            const mention = `@${username}`;
+            if (!this.blockedWords.includes(mention)) {
+                this.blockedWords.push(mention);
+                this.saveBlockedWords();
+                return true;
+            }
+            return false;
         }
     }
     function showToast(message, type = 'success') {
@@ -324,7 +345,7 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
     }
     class MessageBlocker {
         constructor() {
-            this.targetSelector = 'div.message-container';
+            this.targetSelector = 'div.msg-content-container, div.message-container';
             this.blockedWordsManager = new BlockedWordsManager();
             this.init();
             this.setupUI();
@@ -341,21 +362,49 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
         replaceContent(element) {
             let username = '';
             let message = '';
-            let emojiIds = []; // 存储表情ID的数组
-            // 获取用户名
-            const usernameElement = element.querySelector('.user-name .text-ellipsis') ||
-                element.querySelector('.avatar-span');
-            if (usernameElement) {
-                username = usernameElement.textContent?.trim() ||
-                    usernameElement.getAttribute('aria-label') || '';
+            let emojiIds = [];
+        
+            // 1. 找到最外层的消息容器
+            const rootMessageContainer = element.closest('.message-container');
+            if (!rootMessageContainer) {
+                console.log('Could not find root message container');
+                return;
             }
-            // 获取消息内容
-            const messageContentElement = element.querySelector('.markdown-element') ||
-                element.querySelector('.text-element .text-normal');
-            if (messageContentElement) {
-                message = messageContentElement.textContent.trim();
+        
+            // 2. 提取消息的完整内容
+            let fullMessage = '';
+            
+            // 提取@部分
+            const atElement = rootMessageContainer.querySelector('.text-element--at');
+            if (atElement) {
+                fullMessage += atElement.textContent.trim();
             }
-            // 更精确的表情识别方法
+        
+            // 提取普通文本部分
+            const normalTextElements = rootMessageContainer.querySelectorAll('.text-normal');
+            normalTextElements.forEach(el => {
+                fullMessage += ' ' + el.textContent.trim();
+            });
+        
+            // 提取 markdown 内容
+            const markdownElement = rootMessageContainer.querySelector('.markdown-element');
+            if (markdownElement) {
+                fullMessage += ' ' + markdownElement.textContent.trim();
+            }
+        
+            message = fullMessage.trim();
+        
+            // 3. 提取用户名
+            const userNameElement = rootMessageContainer.querySelector('.user-name .text-ellipsis');
+            const avatarElement = rootMessageContainer.querySelector('.avatar-span');
+            
+            if (userNameElement) {
+                username = userNameElement.textContent.trim();
+            } else if (avatarElement && avatarElement.getAttribute('aria-label')) {
+                username = avatarElement.getAttribute('aria-label').trim();
+            }
+        
+            // 4. 提取表情ID
             const extractEmojiId = (emojiElement) => {
                 try {
                     // 优先尝试 data-face-index 属性
@@ -363,20 +412,20 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
                     if (dataFaceIndex) {
                         return parseInt(dataFaceIndex);
                     }
+        
                     // 尝试从 src 属性提取
                     const src = emojiElement.getAttribute('src');
                     if (src) {
-                        // 匹配 /178/png/178.png 这种模式
                         const srcMatch = src.match(/\/(\d+)\/png\/\1\.png$/);
                         if (srcMatch) {
                             return parseInt(srcMatch[1]);
                         }
-                        // 备选方案：匹配路径中的数字
                         const pathMatch = src.match(/\/(\d+)\//);
                         if (pathMatch) {
                             return parseInt(pathMatch[1]);
                         }
                     }
+        
                     // 检查类名
                     const classList = emojiElement.classList;
                     for (let cls of classList) {
@@ -389,10 +438,12 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
                     return null;
                 }
             };
-            // 查找并提取所有表情ID
-            const emojiElements = element.querySelectorAll(
+        
+            // 提取所有表情ID
+            const emojiElements = rootMessageContainer.querySelectorAll(
                 '.face-element__icon[data-face-index], .face-element__icon[src*="/Emoji/"]'
             );
+        
             emojiIds = [];
             emojiElements.forEach(emojiElement => {
                 const emojiId = extractEmojiId(emojiElement);
@@ -401,33 +452,51 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
                     console.log('成功提取表情ID:', emojiId);
                 }
             });
-            // 调试日志
-            if (emojiIds.length > 0) {
-                console.log(`用户 ${username} 的消息中检测到表情ID:`, emojiIds);
-            }
-            // 检查是否需要屏蔽
-            if (username) {
+        
+            // 5. 详细的调试日志
+            console.log('处理消息:', {
+                username,
+                message,
+                emojiIds,
+                containerFound: !!rootMessageContainer,
+                fullMessageContent: message,
+                elementHTML: rootMessageContainer.outerHTML
+            });
+        
+            // 6. 检查是否需要屏蔽
+            if (username || message) {  // 放宽条件，只要有用户名或消息内容就检查
                 const shouldBlock = this.blockedWordsManager.isMessageBlocked(
                     username,
                     message,
-                    emojiIds.length > 0 ? emojiIds : null
+                    emojiIds
                 );
+        
                 if (shouldBlock) {
-                    console.log(`已屏蔽用户 ${username} 的消息`);
-                    element.style.display = 'none';
+                    // 屏蔽整个消息容器
+                    rootMessageContainer.style.display = 'none';
+                    console.log('已屏蔽消息:', {
+                        username,
+                        message,
+                        emojiIds
+                    });
+                    return true;
                 }
             }
+        
+            return false;
         }
         setupObserver() {
             const observer = new MutationObserver((mutations) => {
+                console.log('Mutations detected:', mutations);
                 mutations.forEach((mutation) => {
                     if (mutation.type === 'childList') {
                         mutation.addedNodes.forEach((node) => {
                             if (node.nodeType === Node.ELEMENT_NODE) {
+                                console.log('Processing new node:', node);
                                 if (node.matches(this.targetSelector)) {
                                     this.replaceContent(node);
                                 }
-                                // 递归检查子元素
+                                // 检查子元素
                                 node.querySelectorAll(this.targetSelector).forEach(element => {
                                     this.replaceContent(element);
                                 });
@@ -436,7 +505,8 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
                     }
                 });
             });
-            // 持续观察整个文档
+        
+            // 观察整个文档
             observer.observe(document.body, {
                 childList: true,
                 subtree: true
@@ -1010,5 +1080,7 @@ renderSpecialBlockedEmojisList();
         document.addEventListener('DOMContentLoaded', initialize);
     } else {
         initialize();
+    }
+})();
     }
 })();
