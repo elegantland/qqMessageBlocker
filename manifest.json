@@ -5,7 +5,7 @@
     "slug": "message_blocker",
     "description": "消息屏蔽插件。目前QQ的唯一一个能处理消息内容的插件。支持按关键字屏蔽文字，emoji表情，图片表情包，群机器人，超级表情。觉得好用github给我点个star吧！",
     "version": "1.0.3",
-    "icon"："icon.jpg",
+    "icon"："/icon.jpg",
     "authors": [
         {
             "name": "ele",
