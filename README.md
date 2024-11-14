@@ -46,9 +46,13 @@
 6.添加了对图片的屏蔽
 图片的id非常好获取，只需要右键图片->另存为即可得到图片名字类似这样的格式"1A930D2313002CD5A7F2572DE36F9257.jpg"
 ## LiteLoaderQQNT插件推荐
+
 chii-devtools https://github.com/mo-jinran/chii-devtools/tree/v4
+
 QQ禁用更新 https://github.com/xh321/LiteLoaderQQNT-Kill-Update/tree/master
+
 插件列表查看 https://github.com/ltxhhz/LL-plugin-list-viewer/tree/main
+
 ## bug反馈以及其他问题
 1.qq邮箱：2543971286@qq.com
 
