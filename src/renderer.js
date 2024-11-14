@@ -1,20 +1,21 @@
 // 默认屏蔽词列表
 const DEFAULT_BLOCKED_WORDS = [
     '测试111',
-    '/w',
-    '@AL_1S'
+    '@AL_1S',
+    
 ];
 // 默认特殊屏蔽用户配置
 const DEFAULT_SPECIAL_BLOCKED_USERS = {
     'AL_1S': ['@', '您', '其他bot'],
-    '儒雅': ['3', '多条件'],
+    '儒雅': ['多条件'],
     '测试用户2': ['屏蔽词A', '屏蔽词B', '', ''],
-
+    
 };
 // 默认屏蔽表情ID
 const DEFAULT_BLOCKED_EMOJIS = [99999];
 //以滑稽表情和暴筋表情为例子
 //const DEFAULT_BLOCKED_EMOJIS = [178，146];
+
 // 屏蔽人对应的表情ID
 const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
     '儒雅': [99999],
@@ -24,9 +25,14 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
 // 在默认配置中添加需要屏蔽的图片特征
 const DEFAULT_BLOCKED_IMAGES = [
     'c5fae3c49a465588def54e36af3003f8.jpg',
-    '99205df846cac4d7d680997a0ed56a88.jpg' // 这个是示例中第二张图的文件名
+    '99205df846cac4d7d680997a0ed56a88.jpg', 
     // 可以添加更多需要屏蔽的图片特征
 ];
+const MSG_ID_BLOCK_CONFIG = {
+    // 是否启用 超级表情 屏蔽功能，默认关闭状态
+    enabled: false
+    //enabled: true
+};
 (function () {
     // 屏蔽词管理类
     class BlockedWordsManager {
@@ -404,6 +410,16 @@ const DEFAULT_BLOCKED_IMAGES = [
             this.init();
             this.setupUI();
         }
+        // 新增的方法，用于屏蔽所有含有 msg-id 的消息
+        blockMessagesWithMsgId(element) {
+            if (!MSG_ID_BLOCK_CONFIG.enabled) return; // 检查是否启用功能
+            // 查找包含 msg-id 的元素
+            const lottieContent = element.querySelector('.lottie[msg-id]');
+            if (lottieContent) {
+                element.style.display = 'none'; // 隐藏整个消息容器
+                console.log('Blocked message with msg-id:', element);
+            }
+        }
         init() {
             this.setupObserver();
             this.processExistingElements();
@@ -517,8 +533,8 @@ const DEFAULT_BLOCKED_IMAGES = [
                 elementHTML: rootMessageContainer.outerHTML
             });
 
-            // 6. 检查是否需要屏蔽
-            if (username || message || rootMessageContainer.querySelector('.pic-element')) { // 放宽条件，只要有用户名或消息内容就检查
+            // 6. 检查是否需要屏蔽 // 放宽条件，只要有用户名或消息内容就检查
+            if (username || message || rootMessageContainer.querySelector('.pic-element')) {
                 const shouldBlock = this.blockedWordsManager.isMessageBlocked(
                     username,
                     message,
@@ -538,17 +554,15 @@ const DEFAULT_BLOCKED_IMAGES = [
                     return true;
                 }
             }
-
+            this.blockMessagesWithMsgId(rootMessageContainer);
             return false;
         }
         setupObserver() {
             const observer = new MutationObserver((mutations) => {
-                console.log('Mutations detected:', mutations);
                 mutations.forEach((mutation) => {
                     if (mutation.type === 'childList') {
                         mutation.addedNodes.forEach((node) => {
                             if (node.nodeType === Node.ELEMENT_NODE) {
-                                console.log('Processing new node:', node);
                                 if (node.matches(this.targetSelector)) {
                                     this.replaceContent(node);
                                 }
@@ -586,7 +600,7 @@ const DEFAULT_BLOCKED_IMAGES = [
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM4 12c0-4.42 3.58-8 8-8 1.85 0 3.55.63 4.9 1.69L5.69 16.9C4.63 15.55 4 13.85 4 12zm8 8c-1.85 0-3.55-.63-4.9-1.69L18.31 7.1C19.37 8.45 20 10.15 20 12c0 4.42-3.58 8-8 8z" />
         </svg>
     </i>
-    <div data-v-282aeb44="" class="name">屏蔽词管理</div>
+    <div data-v-282aeb44="" class="name">屏蔽词查看</div>
     `;
                     navItem.addEventListener('click', () => this.showBlockedWordsModal());
                     navBar.appendChild(navItem);
@@ -622,7 +636,7 @@ const DEFAULT_BLOCKED_IMAGES = [
                         color: var(--text_primary);
                         font-size: 16px;
                         font-weight: 500;
-                    ">(在这个页面添加时有概率数据丢失，建议去renderer.js修改)</h2>
+                    ">(此界面无法添加与删除相关条目，一切操作在renderer.js修改)</h2>
         <div style="
                         display: flex;
                         gap: 8px;
