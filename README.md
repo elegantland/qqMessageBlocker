@@ -53,6 +53,8 @@ QQ禁用更新 https://github.com/xh321/LiteLoaderQQNT-Kill-Update/tree/master
 
 插件列表查看 https://github.com/ltxhhz/LL-plugin-list-viewer/tree/main
 
+QQ防撤回 https://github.com/xh321/LiteLoaderQQNT-Anti-Recall/tree/master
+
 ## bug反馈以及其他问题
 1.qq邮箱：2543971286@qq.com
 
