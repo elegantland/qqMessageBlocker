@@ -1,8 +1,8 @@
 # qqMessageBlocker
-一个用于 LiteLoaderQQNT 的消息屏蔽插件。可以按关键词屏蔽你不喜欢的消息和某人的某句话冒犯了你，而你只想屏蔽这句话而不是使用QQ自带的屏蔽某人，善用此插件也可以屏蔽QQ群机器人
+一个用于 LiteLoaderQQNT 的消息屏蔽插件。目前QQ的唯一一个能处理消息内容的插件。支持按关键字屏蔽文字，emoji表情，图片表情包，群机器人。觉得好用github给我点个star吧！
 ## 功能特性
 - 支持自定义关键词屏蔽
-- 支持多平台（并没有测试但应该可以）
+- 支持配置多设备手动同步
 - 效果图
 - 
 ![test](https://github.com/user-attachments/assets/9eef9ed0-dccd-49f2-85b8-70f67a49058e)
@@ -43,15 +43,25 @@
 ![image](https://github.com/user-attachments/assets/dc68c1f3-482c-4248-ac31-57a46df2f299)
 ![image](https://github.com/user-attachments/assets/0ec10c41-751d-473b-88f3-897f8198048d)
 
-
+6.添加了对图片的屏蔽
+图片的id非常好获取，只需要右键图片->另存为即可得到图片名字类似这样的格式"1A930D2313002CD5A7F2572DE36F9257.jpg"
+## LiteLoaderQQNT插件推荐
+chii-devtools https://github.com/mo-jinran/chii-devtools/tree/v4
+QQ禁用更新 https://github.com/xh321/LiteLoaderQQNT-Kill-Update/tree/master
+插件列表查看 https://github.com/ltxhhz/LL-plugin-list-viewer/tree/main
 ## bug反馈以及其他问题
 1.qq邮箱：2543971286@qq.com
 
 ## 更新日志
+2024年11月14日09:00:55 1.0.3
+
+更新了对图片的支持，重写了屏蔽词设定，现在可以正常的识别@和屏蔽了！完善了代码，不会像上个版本一样存在没处理的消息
+更新了icon，将于晚上提交release
+
 2024年11月11日18:59:20 1.0.2
 
 更新了对emoji的支持，至此以后不再对屏蔽词设置界面的添加和删除功能做维护，新功能未使用localstorage
-下个版本将会对图片进行屏蔽支持和开启屏蔽所有机器人的选项，机器人将只有全屏蔽选项
+下个版本将会对图片进行屏蔽支持和屏蔽特定机器人的选项
 
 
 2024年11月11日16:45:51 1.0.1
