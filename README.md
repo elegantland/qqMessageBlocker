@@ -45,6 +45,11 @@
 
 6.添加了对图片的屏蔽
 图片的id非常好获取，只需要右键图片->另存为即可得到图片名字类似这样的格式"1A930D2313002CD5A7F2572DE36F9257.jpg"
+
+7.在1.0.6新加了区分完全匹配的逻辑和包含匹配的逻辑，具体逻辑见图
+
+![QQ_1731654303922](https://github.com/user-attachments/assets/4067e4fa-1647-4520-9954-a7917e83279c)
+
 ## LiteLoaderQQNT插件推荐
 
 chii-devtools https://github.com/mo-jinran/chii-devtools/tree/v4
