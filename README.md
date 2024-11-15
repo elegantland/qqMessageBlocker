@@ -56,6 +56,15 @@
 
 ![QQ_1731654303922](https://github.com/user-attachments/assets/4067e4fa-1647-4520-9954-a7917e83279c)
 
+## 已知问题
+
+夜间模式（不解决，等重构）
+
+设置界面功能无效（不解决，等重构）
+
+查看聊天记录时也会被屏蔽（底层逻辑，无法解决）
+
+
 ## LiteLoaderQQNT插件推荐
 
 chii-devtools https://github.com/mo-jinran/chii-devtools/tree/v4
