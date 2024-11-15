@@ -39,8 +39,8 @@ const INCLUDES_SPECIAL_BLOCKED_USERS_EMOJIS = {
 
 // 在默认配置中添加需要屏蔽的图片特征
 const INCLUDES_BLOCKED_IMAGES = [
-    'c5fae3c49a465588def54e36af3003f8.jpg',
-    '99205df846cac4d7d680997a0ed56a88.jpg' // 这个是示例中第二张图的文件名
+    '76264f7279cd8e5e2d2c597fa68da8a2.jpg',
+    '99205df846cac4d7d680997a0ed56a88.jpg'
     // 可以添加更多需要屏蔽的图片特征
 ];
 
@@ -499,10 +499,16 @@ const MSG_ID_BLOCK_CONFIG = {
             // 4. 提取表情ID
             const extractEmojiId = (emojiElement) => {
                 try {
+                    // 首先检查是否是真正的表情元素
+                    if (!emojiElement.closest('.face-element') ||
+                        emojiElement.closest('.pic-element')) {
+                        return null;
+                    }
                     const dataFaceIndex = emojiElement.getAttribute('data-face-index');
                     if (dataFaceIndex) {
                         return parseInt(dataFaceIndex);
                     }
+
                     const src = emojiElement.getAttribute('src');
                     if (src) {
                         const srcMatch = src.match(/\/(\d+)\/png\/\1\.png$/);
@@ -522,7 +528,7 @@ const MSG_ID_BLOCK_CONFIG = {
             };
             // 5. 提取所有表情ID
             const emojiElements = rootMessageContainer.querySelectorAll(
-                '.face-element__icon[data-face-index], .face-element__icon[src*="/Emoji/"]'
+                '.face-element__icon[data-face-index], .face-element__icon[src*="/Emoji/"], .face-element__icon'
             );
             emojiIds = [];
             emojiElements.forEach(emojiElement => {
@@ -547,8 +553,11 @@ const MSG_ID_BLOCK_CONFIG = {
                     console.log(`屏蔽表情 ID: ${emojiId}`);
                 }
             });
+            //  检查消息是否为空
             const messageContent = rootMessageContainer.querySelector('.message-content');
-            if (messageContent && messageContent.textContent.trim() === '') {
+            const imageElements = rootMessageContainer.querySelectorAll('.pic-element');
+            // 只有在没有文本内容且没有图片时，才隐藏消息容器
+            if (messageContent && messageContent.textContent.trim() === '' && imageElements.length === 0) {
                 rootMessageContainer.style.display = 'none'; // 隐藏整个消息容器
                 console.log('Blocked empty message container after blocking emoji');
             }
