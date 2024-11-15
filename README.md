@@ -31,6 +31,7 @@
 4. 修改后保存renderer.js，重启QQ即可生效
 
 5.添加emoji屏蔽
+
 首先安装chii-devtools https://github.com/mo-jinran/chii-devtools/tree/v4
 然后按f12，点击新出来的窗口左上角，再点击你需要屏蔽的表情的那条信息，则右边会高亮一串代码
 
@@ -47,7 +48,9 @@
 ![image](https://github.com/user-attachments/assets/0ec10c41-751d-473b-88f3-897f8198048d)
 
 6.添加了对图片的屏蔽
-图片的id非常好获取，只需要右键图片->另存为即可得到图片名字类似这样的格式"1A930D2313002CD5A7F2572DE36F9257.jpg"
+
+图片的id获取逻辑同上，但是CTRL+F 查找的是data-path，然后可以找到类似这样的格式
+"/1A930D2313002CD5A7F2572DE36F9257.jpg"，只需要斜杠后的这一段。
 
 7.在1.0.6新加了区分完全匹配的逻辑和包含匹配的逻辑，具体逻辑见图
 
