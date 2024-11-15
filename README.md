@@ -13,6 +13,9 @@
 3. 在设置里找到LiteLoaderQQNT的相关设置，从那里安装 
 4. 重启 QQ
 ## 使用方法
+
+首先保留好你修改过后的renderer.js，那是你本地的所有屏蔽逻辑，如果使用插件自动安装可能会覆盖数据！
+
 1. 在设置中找到LiteLoaderQQNT选项，点击进入数据目录
    
 ![f643b13ae4c6129486731a2bc6ffe7cc](https://github.com/user-attachments/assets/39aab0b8-c12f-401d-82c1-d2793a516af8)
