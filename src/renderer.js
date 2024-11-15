@@ -25,7 +25,7 @@ const EXACT_SPECIAL_BLOCKED_USERS = {
 
 
 // 包含匹配屏蔽表情ID
-const INCLUDES_BLOCKED_EMOJIS = [178, 146];
+const INCLUDES_BLOCKED_EMOJIS = [99999];
 //以滑稽表情和暴筋表情为例子
 //const INCLUDES_BLOCKED_EMOJIS = [178,146];
 
