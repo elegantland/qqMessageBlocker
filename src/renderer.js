@@ -1,21 +1,19 @@
 // 默认屏蔽词列表
 const DEFAULT_BLOCKED_WORDS = [
     '测试111',
-    '@AL_1S',
-    
+
 ];
 // 默认特殊屏蔽用户配置
 const DEFAULT_SPECIAL_BLOCKED_USERS = {
     'AL_1S': ['@', '您', '其他bot'],
     '儒雅': ['多条件'],
     '测试用户2': ['屏蔽词A', '屏蔽词B', '', ''],
-    
+
 };
 // 默认屏蔽表情ID
 const DEFAULT_BLOCKED_EMOJIS = [99999];
 //以滑稽表情和暴筋表情为例子
 //const DEFAULT_BLOCKED_EMOJIS = [178，146];
-
 // 屏蔽人对应的表情ID
 const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
     '儒雅': [99999],
@@ -25,13 +23,13 @@ const DEFAULT_SPECIAL_BLOCKED_USERS_EMOJIS = {
 // 在默认配置中添加需要屏蔽的图片特征
 const DEFAULT_BLOCKED_IMAGES = [
     'c5fae3c49a465588def54e36af3003f8.jpg',
-    '99205df846cac4d7d680997a0ed56a88.jpg', 
+    '99205df846cac4d7d680997a0ed56a88.jpg' // 这个是示例中第二张图的文件名
     // 可以添加更多需要屏蔽的图片特征
 ];
 const MSG_ID_BLOCK_CONFIG = {
-    // 是否启用 超级表情 屏蔽功能，默认关闭状态
-    enabled: false
-    //enabled: true
+    // 是否启用 超级表情 屏蔽功能
+    enabled: true
+    //enabled: false
 };
 (function () {
     // 屏蔽词管理类
