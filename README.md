@@ -59,7 +59,8 @@
 ## 已知问题
 
 查看聊天记录时也会被屏蔽（底层逻辑，无法解决）
-
+某奇怪的滑块
+需要一个导出配置的功能
 
 ## LiteLoaderQQNT插件推荐
 
@@ -94,7 +95,6 @@ QQ防撤回 https://github.com/xh321/LiteLoaderQQNT-Anti-Recall/tree/master
 
 
 优化了emoji的屏蔽，将会只隐藏emoji表情
-由于设置里的屏蔽词查看写的太烂，将在后续的版本直接去除
 
 2024年11月14日17:15:06 1.0.5
 
