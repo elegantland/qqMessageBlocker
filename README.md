@@ -10,8 +10,10 @@
 
 ## 安装方法
 1. 下载最新版本的LiteLoaderQQNT插件和本插件。LiteLoaderQQNT 官网：https://liteloaderqqnt.github.io
-3. 在设置里找到LiteLoaderQQNT的相关设置，从那里安装 
-4. 重启 QQ
+
+2. 在设置里找到LiteLoaderQQNT的相关设置，从那里安装
+
+3. 重启 QQ
 ## 使用方法
 
 首先保留好你修改过后的renderer.js，那是你本地的所有屏蔽逻辑，如果使用插件自动安装可能会覆盖数据！
@@ -35,6 +37,7 @@
 5.添加emoji屏蔽
 
 首先安装chii-devtools https://github.com/mo-jinran/chii-devtools/tree/v4
+
 然后按f12，点击新出来的窗口左上角，再点击你需要屏蔽的表情的那条信息，则右边会高亮一串代码
 
 ![image](https://github.com/user-attachments/assets/561c408d-5f0a-4e42-a1ac-5964bb293d22)
@@ -44,7 +47,9 @@
 
 ![image](https://github.com/user-attachments/assets/7e896ef2-cda1-4cd6-9d7b-04bf8895ee84)
 
-复制到记事本，CTRL+F 查找 data-face-index，后面跟的代码即是表情代码，然后打开按照上面的方法打开renderer.js进行修改即可。修改完一样需要重启（对renderer.js的修改记得使用英文逗号）
+复制到记事本，CTRL+F 查找 data-face-index，后面跟的代码即是表情代码，然后打开按照上面的方法打开renderer.js进行修改即可。
+
+修改完一样需要重启（对renderer.js的修改记得使用英文逗号）
 
 ![image](https://github.com/user-attachments/assets/dc68c1f3-482c-4248-ac31-57a46df2f299)
 ![image](https://github.com/user-attachments/assets/0ec10c41-751d-473b-88f3-897f8198048d)
@@ -52,6 +57,7 @@
 6.添加了对图片的屏蔽
 
 图片的id获取逻辑同上，但是CTRL+F 查找的是data-path，然后可以找到类似这样的格式
+
 "/1A930D2313002CD5A7F2572DE36F9257.jpg"，只需要斜杠后的这一段。
 
 7.在1.0.6新加了区分完全匹配的逻辑和包含匹配的逻辑，具体逻辑见图
@@ -61,6 +67,7 @@
 ## 已知问题
 
 查看聊天记录时也会被屏蔽（底层逻辑，无法解决）
+
 需要一个导出配置的功能
 
 ## LiteLoaderQQNT插件推荐
@@ -83,6 +90,8 @@ QQ防撤回 https://github.com/xh321/LiteLoaderQQNT-Anti-Recall/tree/master
 上个版本实在是太不稳定了，所以又重构了一下，现在不存在任何bug（应该）
 
 有可能某些模块功能表现不正常，如果遇到这种情况欢迎反馈。
+
+下个版本将会继续重构代码，保持代码的简洁性（如果不是修bug的话）
 
 2024年11月20日17:10:27 2.0.0
 
@@ -119,5 +128,8 @@ QQ防撤回 https://github.com/xh321/LiteLoaderQQNT-Anti-Recall/tree/master
 
 2024年11月11日16:45:51 1.0.1
 
-对设置界面进行了美化，同时修改了屏蔽词相关数据的存储方式，从localstorage到直接写入renderer.js，这样子需要导入导出配置的话复制renderer.js就好了
+对设置界面进行了美化，同时修改了屏蔽词相关数据的存储方式，从localstorage到直接写入renderer.js，
+
+这样子需要导入导出配置的话复制renderer.js就好了
+
 同时保留原来的localstorage存储（假如你能正常使用的话），所以屏蔽词设置界面建议用作查看屏蔽词是否添加成功.
