@@ -78,6 +78,8 @@
 
 需要便捷的显示emoji的id和图片的id，方便添加
 
+准备加入回复去除@的功能，	提供开关精简各种栏的无用功能
+
 ## LiteLoaderQQNT插件推荐
 
 chii-devtools https://github.com/mo-jinran/chii-devtools/tree/v4
