@@ -1179,6 +1179,7 @@
                 }
             }
             setupUI() {
+                console.log('开始设置UI');
                 const checkForNavBar = setInterval(() => {
                     const navBar = document.querySelector('.setting-tab .nav-bar.liteloader');
                     if (navBar) {
@@ -1249,11 +1250,12 @@
             }
     
             renderWordsList() {
+                console.log('开始渲染屏蔽词列表');
                 const blockedWordsList = document.getElementById('blockedWordsList');
                 const exactWordsList = document.getElementById('exactBlockedWordsList');
     
                 if (blockedWordsList) {
-                    console.log('Current blockedWords:', Array.from(this.blockedWordsManager.blockedWords));
+                    console.log('当前屏蔽词:', Array.from(this.blockedWordsManager.blockedWords));
                     const wordsHtml = Array.from(this.blockedWordsManager.blockedWords)
                         .filter(word => word.trim())
                         .map(word => {
@@ -1271,7 +1273,7 @@
                 }
     
                 if (exactWordsList) {
-                    console.log('Current exactBlockedWords:', Array.from(this.blockedWordsManager.exactBlockedWords));
+                    console.log('当前完全匹配屏蔽词:', Array.from(this.blockedWordsManager.exactBlockedWords));
                     const exactWordsHtml = Array.from(this.blockedWordsManager.exactBlockedWords)
                         .filter(word => word.trim())
                         .map(word => {
@@ -1290,6 +1292,7 @@
             }
     
             renderSpecialUsersList() {
+                console.log('开始渲染特殊用户列表');
                 const includesUsersList = document.querySelector('#specialBlockedUsersList');
                 const exactUsersList = document.querySelector('#exactSpecialBlockedUsersList');
     
@@ -1375,10 +1378,11 @@
             }
     
             renderEmojisList() {
+                console.log('开始渲染表情列表');
                 const emojisList = document.getElementById('emojisList');
                 if (!emojisList) return;
     
-                console.log('Current blockedEmojis:', Array.from(this.blockedWordsManager.blockedEmojis));
+                console.log('当前表情屏蔽:', Array.from(this.blockedWordsManager.blockedEmojis));
     
                 const emojisHtml = Array.from(this.blockedWordsManager.blockedEmojis)
                     .sort((a, b) => a - b)
@@ -1398,10 +1402,11 @@
             }
     
             renderSpecialEmojisList() {
+                console.log('开始渲染特定用户表情列表');
                 const specialEmojisList = document.getElementById('specialEmojisList');
                 if (!specialEmojisList) return;
     
-                console.log('Current specialBlockedUsersEmojis:', this.blockedWordsManager.specialBlockedUsersEmojis);
+                console.log('当前特定用户表情屏蔽:', this.blockedWordsManager.specialBlockedUsersEmojis);
     
                 const specialEmojisHtml = Object.entries(this.blockedWordsManager.specialBlockedUsersEmojis)
                     .map(([userId, emojiIds]) => {
@@ -1424,6 +1429,7 @@
             }
     
             renderBlockedImagesList() {
+                console.log('开始渲染图片列表');
                 const imagesList = document.getElementById('imagesList');
                 if (!imagesList) return;
     
@@ -1744,29 +1750,35 @@
             }
 
             showBlockedWordsModal() {
+                console.log('开始显示屏蔽词设置界面');
                 const scrollView = document.querySelector('.q-scroll-view.scroll-view--show-scrollbar.liteloader');
-                if (!scrollView) return;
+                console.log('找到滚动视图容器:', scrollView);
+                if (!scrollView) {
+                    console.error('未找到滚动视图容器');
+                    return;
+                }
+                scrollView.innerHTML = '';
 
                 // 添加通用样式
                 const style = document.createElement('style');
-                style.textContent = [
-                    '.settings-container { padding: 16px; }',
-                    '.settings-section { background: var(--bg_bottom_standard); border-radius: 8px; margin-bottom: 16px; }',
-                    '.section-header { padding: 16px; border-bottom: 1px solid var(--border_standard); }',
-                    '.section-title { font-size: 16px; font-weight: 500; color: var(--text_primary); }',
-                    '.section-desc { font-size: 12px; color: var(--text_secondary); margin-top: 4px; }',
-                    '.section-content { padding: 16px; }',
-                    '.settings-list { list-style: none; padding: 0; margin: 0; }',
-                    '.settings-list-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; margin-bottom: 8px; background: var(--bg_medium_standard); border: 1px solid var(--border_standard); border-radius: 8px; gap: 12px; }',
-                    '.settings-list-item span { flex: 1; color: var(--text_primary); word-break: break-all; white-space: pre-wrap; line-height: 1.5; font-size: 14px; }',
-                    '.delete-button { height: 32px; padding: 0 16px; border-radius: 6px; font-size: 14px; cursor: pointer; background: #E54D42; color: white; border: none; }',
-                    '.add-button { height: 32px; padding: 0 16px; border-radius: 6px; font-size: 14px; cursor: pointer; background: var(--brand_standard); color: white; border: none; }',
-                    '.settings-input { flex: 1; height: 32px; padding: 0 12px; background: var(--bg_bottom_standard); border: 1px solid var(--border_standard); border-radius: 6px; color: var(--text_primary); font-size: 14px; }',
-                    'setting-item { padding: 16px; }',
-                    'setting-item[data-direction="row"] { display: flex; flex-direction: column; }',
-                    'setting-text { display: block; line-height: 1.5; }',
-                    'setting-text[data-type="secondary"] { margin-top: 4px; }',
-                ].join('');
+                style.textContent = `
+                    .settings-container { padding: 16px; }
+                    .settings-section { background: var(--bg_bottom_standard); border-radius: 8px; margin-bottom: 16px; }
+                    .section-header { padding: 16px; border-bottom: 1px solid var(--border_standard); }
+                    .section-title { font-size: 16px; font-weight: 500; color: var(--text_primary); }
+                    .section-desc { font-size: 12px; color: var(--text_secondary); margin-top: 4px; }
+                    .section-content { padding: 16px; }
+                    .settings-list { list-style: none; padding: 0; margin: 0; }
+                    .settings-list-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; margin-bottom: 8px; background: var(--bg_medium_standard); border: 1px solid var(--border_standard); border-radius: 8px; gap: 12px; }
+                    .settings-list-item span { flex: 1; color: var(--text_primary); word-break: break-all; white-space: pre-wrap; line-height: 1.5; font-size: 14px; }
+                    .delete-button { height: 32px; padding: 0 16px; border-radius: 6px; font-size: 14px; cursor: pointer; background: #E54D42; color: white; border: none; }
+                    .add-button { height: 32px; padding: 0 16px; border-radius: 6px; font-size: 14px; cursor: pointer; background: var(--brand_standard); color: white; border: none; }
+                    .settings-input { flex: 1; height: 32px; padding: 0 12px; background: var(--bg_bottom_standard); border: 1px solid var(--border_standard); border-radius: 6px; color: var(--text_primary); font-size: 14px; }
+                    setting-item { padding: 16px; }
+                    setting-item[data-direction="row"] { display: flex; flex-direction: column; }
+                    setting-text { display: block; line-height: 1.5; }
+                    setting-text[data-type="secondary"] { margin-top: 4px; }
+                `;
                 document.head.appendChild(style);
 
                 const container = document.createElement('div');
@@ -1901,25 +1913,21 @@
                     </setting-panel>
                 `;
 
-                const importConfigSection = document.createElement('setting-section');
-                importConfigSection.setAttribute('data-title', '配置导入导出');
-                importConfigSection.innerHTML = `
+                const configSection = document.createElement('setting-section');
+                configSection.setAttribute('data-title', '配置管理');
+                configSection.innerHTML = `
                     <setting-panel>
                         <setting-list data-direction="column">
                             <setting-item data-direction="column">
                                 <div>
-                                    <setting-text>导出配置</setting-text>
-                                    <setting-text data-type="secondary">将当前配置导出为JSON文件</setting-text>
+                                    <setting-text>导入/导出配置</setting-text>
+                                    <setting-text data-type="secondary">可以导出当前配置或导入之前的配置</setting-text>
                                 </div>
-                                <button id="exportConfigBtn" class="add-button" style="margin-top: 8px;">导出配置</button>
-                            </setting-item>
-                            <setting-item data-direction="column">
-                                <div>
-                                    <setting-text>导入配置</setting-text>
-                                    <setting-text data-type="secondary">从JSON文件导入配置</setting-text>
+                                <div class="input-group" style="margin-top: 8px; display: flex; gap: 8px;">
+                                    <button id="exportConfigBtn" class="add-button">导出配置</button>
+                                    <input type="file" id="importConfigFile" accept=".json" style="display: none;">
+                                    <button id="importConfigBtn" class="add-button" onclick="document.getElementById('importConfigFile').click()">导入配置</button>
                                 </div>
-                                <input type="file" id="importConfigFile" accept=".json" style="margin-top: 8px;">
-                                <button id="importConfigBtn" class="add-button" style="margin-left: 8px;">导入配置</button>
                             </setting-item>
                         </setting-list>
                     </setting-panel>
@@ -1930,9 +1938,10 @@
                 container.appendChild(emojiSection);
                 container.appendChild(specialEmojiSection);
                 container.appendChild(blockedImagesSection);
-                container.appendChild(importConfigSection);
-
+                container.appendChild(configSection);
+                console.log('准备添加设置界面到滚动视图');
                 scrollView.appendChild(container);
+                console.log('设置界面已添加到滚动视图');
 
                 // Add event listeners for the add buttons
                 const addBlockedWordBtn = document.getElementById('addBlockedWord');
