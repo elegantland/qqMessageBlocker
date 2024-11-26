@@ -2318,7 +2318,7 @@
 
         // 初始化函数
         function initializeAll() {
-            console.log('MessageBlocker 2.0.2 loaded');
+            console.log('MessageBlocker 2.0.3 loaded');
             messageBlocker = new MessageBlocker();
             window.messageBlocker = messageBlocker;
         }
