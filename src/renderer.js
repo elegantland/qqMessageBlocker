@@ -408,20 +408,24 @@
     
             // 检查消息是否应该被屏蔽
             isMessageBlocked(element, username, message, emojiIds) {
-                if (!message && !emojiIds) return false;
+                if (!message && !emojiIds) return { blocked: false };
 
                 // 检查普通屏蔽词
                 if (message) {
                     for (const word of this.blockedWords) {
                         if (message.includes(word)) {
-                            return true;
+                            return { blocked: true, type: 'include' };
                         }
                     }
                 }
 
                 // 检查完全匹配屏蔽词
                 if (message && this.exactBlockedWords.has(message)) {
-                    return true;
+                    // 特殊处理完全匹配"1"的情况
+                    if (message === "1") {
+                        return { blocked: true, type: 'exact', isOne: true };
+                    }
+                    return { blocked: true, type: 'exact' };
                 }
 
                 // 检查特殊用户屏蔽词
@@ -430,7 +434,7 @@
                     if (userBlockedWords) {
                         for (const word of userBlockedWords) {
                             if (message.includes(word)) {
-                                return true;
+                                return { blocked: true, type: 'special' };
                             }
                         }
                     }
@@ -440,7 +444,7 @@
                 if (username && message) {
                     const userExactBlockedWords = this.exactSpecialBlockedUsers[username];
                     if (userExactBlockedWords && userExactBlockedWords.includes(message)) {
-                        return true;
+                        return { blocked: true, type: 'exactSpecial' };
                     }
                 }
 
@@ -449,7 +453,7 @@
                     // 检查全局屏蔽的表情
                     for (const emojiId of emojiIds) {
                         if (this.blockedEmojis.has(emojiId)) {
-                            return true;
+                            return { blocked: true, type: 'emoji' };
                         }
                     }
 
@@ -457,25 +461,13 @@
                     if (username && this.specialBlockedUsersEmojis[username]) {
                         for (const emojiId of emojiIds) {
                             if (this.specialBlockedUsersEmojis[username].includes(emojiId)) {
-                                return true;
+                                return { blocked: true, type: 'specialEmoji' };
                             }
                         }
                     }
                 }
 
-                // 检查图片
-                const images = element.querySelectorAll('img.image-element');
-                if (images.length > 0) {
-                    for (const img of images) {
-                        const src = img.src;
-                        const fileName = src.split('/').pop();
-                        if (this.blockedImages.has(fileName)) {
-                            return true;
-                        }
-                    }
-                }
-
-                return false;
+                return { blocked: false };
             }
     
             extractUsername(element) {
@@ -560,29 +552,17 @@
                 if (!element || !this.blockedImages) return false;
 
                 // 查找图片元素
-                const imgElements = element.querySelectorAll('img, .image');
+                const imgElements = element.querySelectorAll('div.image.pic-element img.image-content, div.pic-element img.image-content');
                 if (!imgElements || imgElements.length === 0) return false;
 
                 // 检查每个图片是否在屏蔽列表中
                 for (const img of imgElements) {
-                    // 获取所有可能包含图片路径的属性
-                    const paths = [
-                        img.src,
-                        img.getAttribute('src'),
-                        img.getAttribute('data-src'),
-                        img.getAttribute('data-path')
-                    ].filter(Boolean);
+                    const src = img.src || img.getAttribute('src');
+                    if (!src) continue;
 
-                    // 检查每个路径
-                    for (const path of paths) {
-                        // 从路径中提取文件名
-                        const match = path.match(/[^/\\&?]+\.\w{3,4}(?=([?&].*$|$))/);
-                        if (match) {
-                            const fileName = match[0];
-                            if (this.blockedImages.has(fileName)) {
-                                return true;
-                            }
-                        }
+                    const fileName = src.split('/').pop();
+                    if (this.blockedImages.has(fileName)) {
+                        return true;
                     }
                 }
 
@@ -741,7 +721,7 @@
                             </div>
                         `;
                     })
-                    .filter(html => html) // 过滤掉空字符串
+                    .filter(html => html)
                     .join('');
     
                 specialEmojisList.innerHTML = specialEmojisHtml || '<div class="settings-list-item">暂无特定用户表情屏蔽配置</div>';
@@ -973,10 +953,10 @@
                         element.style.opacity = '0';
                         
                         // 处理内容
-                        const isBlocked = this.replaceContent(element);
+                        const result = this.replaceContent(element);
                         
-                        // 如果内容没有被屏蔽，显示元素
-                        if (!isBlocked) {
+                        // 如果内容没有被屏蔽或只是部分屏蔽，显示元素
+                        if (!result.blocked || result.partial) {
                             requestAnimationFrame(() => {
                                 element.style.opacity = '1';
                             });
@@ -1003,10 +983,10 @@
                                         element.style.opacity = '0';
                                         
                                         // 处理内容
-                                        const isBlocked = this.replaceContent(element);
+                                        const result = this.replaceContent(element);
                                         
-                                        // 如果内容没有被屏蔽，显示元素
-                                        if (!isBlocked) {
+                                        // 如果内容没有被屏蔽或只是部分屏蔽，显示元素
+                                        if (!result.blocked || result.partial) {
                                             requestAnimationFrame(() => {
                                                 element.style.opacity = '1';
                                             });
@@ -1025,35 +1005,79 @@
                 try {
                     const username = this.extractUsername(element);
                     const message = this.getMessageContent(element);
-                    const emojiElements = element.querySelectorAll('.qqemoji, .emoji');
+                    const emojiElements = element.querySelectorAll('.face-element, .qqemoji, .emoji');
                     const emojiIds = Array.from(emojiElements).map(emoji => {
-                        const src = emoji.src || emoji.getAttribute('src');
-                        return src ? src.match(/(\d+)/)?.[1] : null;
+                        const img = emoji.querySelector('img');
+                        if (img) {
+                            const src = img.src || img.getAttribute('src');
+                            return src ? src.match(/(\d+)/)?.[1] : null;
+                        }
+                        return null;
                     }).filter(Boolean);
 
                     // 检查是否应该屏蔽消息（包括文本、表情和图片）
-                    const shouldBlock = 
-                        this.blockedWordsManager.isMessageBlocked(element, username, message, emojiIds) ||
-                        this.blockedWordsManager.isBlockedImage(element);
+                    const blockResult = this.blockedWordsManager.isMessageBlocked(element, username, message, emojiIds);
+                    const imageBlocked = this.blockedWordsManager.isBlockedImage(element);
 
-                    if (shouldBlock) {
-                        if (REPLACEMODE.normalWords || REPLACEMODE.exactWords || 
-                            REPLACEMODE.specialUsers || REPLACEMODE.exactSpecialUsers || 
-                            REPLACEMODE.emojis || REPLACEMODE.images || 
-                            REPLACEMODE.superEmoji) {
-                            element.textContent = REPLACEMODE.replaceword;
+                    if (blockResult.blocked || imageBlocked) {
+                        // 如果是完全匹配"1"的情况
+                        if (blockResult.type === 'exact' && blockResult.isOne) {
+                            // 检查是否包含表情或图片
+                            const hasEmoji = emojiElements.length > 0;
+                            const hasImage = element.querySelectorAll('div.image.pic-element, div.pic-element').length > 0;
+
+                            if (hasEmoji || hasImage) {
+                                // 1+表情 或 1+图片 或 1+表情+图片的情况：只隐藏包含"1"的文本元素
+                                const textElements = element.querySelectorAll('.text-element');
+                                textElements.forEach(textElement => {
+                                    const textNormal = textElement.querySelector('.text-normal');
+                                    if (textNormal && textNormal.textContent.trim() === "1") {
+                                        textElement.style.display = 'none';
+                                    }
+                                });
+                                
+                                // 确保消息容器可见
+                                const messageContainer = element.closest('.message-container');
+                                if (messageContainer) {
+                                    messageContainer.style.opacity = '1';
+                                }
+                                const messageContent = element.closest('.msg-content-container');
+                                if (messageContent) {
+                                    messageContent.style.opacity = '1';
+                                }
+                                
+                                return { blocked: true, partial: true };
+                            } else {
+                                // 只有1的情况：完全屏蔽
+                                if (REPLACEMODE.normalWords || REPLACEMODE.exactWords || 
+                                    REPLACEMODE.specialUsers || REPLACEMODE.exactSpecialUsers || 
+                                    REPLACEMODE.emojis || REPLACEMODE.images || 
+                                    REPLACEMODE.superEmoji) {
+                                    element.textContent = REPLACEMODE.replaceword;
+                                } else {
+                                    element.style.display = 'none';
+                                }
+                                return { blocked: true };
+                            }
                         } else {
-                            element.style.display = 'none';
+                            // 其他屏蔽情况，使用原有逻辑
+                            if (REPLACEMODE.normalWords || REPLACEMODE.exactWords || 
+                                REPLACEMODE.specialUsers || REPLACEMODE.exactSpecialUsers || 
+                                REPLACEMODE.emojis || REPLACEMODE.images || 
+                                REPLACEMODE.superEmoji) {
+                                element.textContent = REPLACEMODE.replaceword;
+                            } else {
+                                element.style.display = 'none';
+                            }
+                            return { blocked: true };
                         }
-                        return true;
                     }
-                    return false;
+                    return { blocked: false };
                 } catch (error) {
                     console.error('Error in replaceContent:', error);
-                    return false;
+                    return { blocked: false };
                 }
             }
-
             extractUsername(element) {
                 try {
                     // 首先尝试从父元素获取消息容器
