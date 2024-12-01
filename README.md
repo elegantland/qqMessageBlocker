@@ -2,7 +2,7 @@
 
 [![GitHub stars](https://img.shields.io/github/stars/elegantland/qqMessageBlocker?style=social)](https://github.com/elegantland/qqMessageBlocker)
 
-> 一个功能强大的 LiteLoaderQQNT 消息屏蔽插件，支持多种屏蔽方式，是目前 QQ 唯一一个能处理消息内容的插件。
+> 一个功能强大的 LiteLoaderQQNT 消息屏蔽插件，支持多种屏蔽方式，是目前 QQ 唯一能处理消息内容的插件。
 
 依然需要大家的提供更好的关于新功能的想法！如果遇到问题我很乐意解决。
 
@@ -33,6 +33,8 @@
 > 💡 建议：每次更新前都导出一下自己的配置！
 
 ### 基础使用
+
+更全面的相关介绍在elegantland.github.io
 
 现在插件提供了可视化的设置界面，你可以直接在设置中进行规则配置。以下是一些基本的规则添加说明：
 
