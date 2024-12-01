@@ -34,7 +34,7 @@
 
 ### 基础使用
 
-更全面的相关介绍在elegantland.github.io
+更全面的相关介绍在[elegantland.github.io](https://elegantland.github.io/)
 
 现在插件提供了可视化的设置界面，你可以直接在设置中进行规则配置。以下是一些基本的规则添加说明：
 
