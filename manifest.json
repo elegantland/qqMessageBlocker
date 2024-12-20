@@ -9,7 +9,7 @@
     "authors": [
         {
             "name": "ele",
-            "link": "https://github.com/elegantland/qqMessageBlocker"
+            "link": "https://github.com/elegantland"
         }
     ],
     "platform": [
@@ -23,7 +23,7 @@
         "preload": "./src/preload.js"
     },
     "repository": {
-        "repo": "elegantloneland/qqMessageBlocker",
+        "repo": "elegantland/qqMessageBlocker",
         "branch": "main"
       }
 }
