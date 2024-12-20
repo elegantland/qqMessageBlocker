@@ -1,8 +1,8 @@
 (function () {
-    // 包含匹配屏蔽词列表2.0.5版
+    // 包含匹配屏蔽词列表2.0.6版
     let INCLUDES_BLOCKED_WORDS = [
         //'测试111',//会屏蔽 测试111 ，也会屏蔽测试111111
-        //'@AL_1S',
+        '@AL_1S',
         //'@幻想',
     ];
     // 完全匹配屏蔽词列表
@@ -42,6 +42,14 @@
         // 是否启用 超级表情 屏蔽功能,默认true启用，关闭用false
         enabled: true
     };
+    let PA_CONFIG = {
+        // 是否启用 拍一拍功能,默认true启用，关闭用false
+        enabled: true,
+        // 特定用户拍一拍屏蔽配置
+        users: {}
+        // 空对象表示屏蔽所有拍一拍消息
+        //'儒雅': [], // 只屏蔽儒雅所有拍一拍消息
+    };
     let REPLACEMODE = {
         normalWords: false,      // 普通屏蔽词是否使用替换模式
         exactWords: false,       // 完全匹配屏蔽词是否使用替换模式
@@ -50,7 +58,8 @@
         emojis: false,         // 表情是否使用替换模式
         images: false,         // 图片是否使用替换模式
         superEmoji: false,      // 超级表情是否使用替换模式
-        replaceword: "[已屏蔽]"
+        pat: false,             // 拍一拍是否使用替换模式
+        replaceword: "[已屏蔽]" // 替换词
     };
     // Toast 通知管理类
     class Toast {
@@ -144,6 +153,8 @@
             this.specialBlockedUsersEmojis = {};
             this.blockedImages = new Set();
             this.blockSuperEmoji = MSG_ID_BLOCK_CONFIG.enabled;
+            this.blockPat = PA_CONFIG.enabled;
+            this.patUsers = PA_CONFIG.users;
 
             // 初始化默认配置
             this.defaultConfig = {
@@ -154,7 +165,9 @@
                 blockedEmojis: INCLUDES_BLOCKED_EMOJIS,
                 specialBlockedUsersEmojis: INCLUDES_SPECIAL_BLOCKED_USERS_EMOJIS,
                 blockedImages: INCLUDES_BLOCKED_IMAGES,
-                blockSuperEmoji: MSG_ID_BLOCK_CONFIG.enabled
+                blockSuperEmoji: MSG_ID_BLOCK_CONFIG.enabled,
+                blockPat: PA_CONFIG.enabled,
+                patUsers: PA_CONFIG.users
             };
 
             // 加载配置
@@ -299,6 +312,21 @@
                     this.blockSuperEmoji = MSG_ID_BLOCK_CONFIG.enabled;
                 }
 
+                // 加载拍一拍屏蔽配置
+                if (typeof config.blockPat === 'boolean') {
+                    this.blockPat = config.blockPat;
+                } else {
+                    // 如果没有用户配置，使用默认配置
+                    this.blockPat = PA_CONFIG.enabled;
+                }
+
+                // 加载拍一拍用户配置
+                if (config.patUsers) {
+                    this.patUsers = config.patUsers;
+                } else {
+                    this.patUsers = PA_CONFIG.users;
+                }
+
                 // 更新全局变量
                 INCLUDES_BLOCKED_WORDS = Array.from(this.blockedWords);
                 EXACT_BLOCKED_WORDS = Array.from(this.exactBlockedWords);
@@ -308,6 +336,8 @@
                 INCLUDES_SPECIAL_BLOCKED_USERS_EMOJIS = { ...this.specialBlockedUsersEmojis };
                 INCLUDES_BLOCKED_IMAGES = Array.from(this.blockedImages);
                 MSG_ID_BLOCK_CONFIG.enabled = this.blockSuperEmoji;
+                PA_CONFIG.enabled = this.blockPat;
+                PA_CONFIG.users = this.patUsers;
 
                 // 更新UI
                 messageBlocker.renderWordsList();
@@ -332,6 +362,8 @@
                 INCLUDES_SPECIAL_BLOCKED_USERS_EMOJIS = { ...this.specialBlockedUsersEmojis };
                 INCLUDES_BLOCKED_IMAGES = Array.from(this.blockedImages);
                 MSG_ID_BLOCK_CONFIG.enabled = this.blockSuperEmoji;
+                PA_CONFIG.enabled = this.blockPat;
+                PA_CONFIG.users = this.patUsers;
 
                 const dataToSave = {
                     blockedWords: Array.from(this.blockedWords),
@@ -341,7 +373,9 @@
                     blockedEmojis: Array.from(this.blockedEmojis),
                     specialBlockedUsersEmojis: this.specialBlockedUsersEmojis,
                     blockedImages: Array.from(this.blockedImages),
-                    blockSuperEmoji: this.blockSuperEmoji
+                    blockSuperEmoji: this.blockSuperEmoji,
+                    blockPat: this.blockPat,
+                    patUsers: this.patUsers
                 };
 
                 // 使用 LiteLoader API 保存配置
@@ -405,7 +439,36 @@
 
         // 检查消息是否应该被屏蔽
         isMessageBlocked(element, username, message, emojiIds) {
-            if (!message && !emojiIds) return { blocked: false };
+            if (!message && !emojiIds) {
+                // 检查是否是拍一拍消息
+                if (this.blockPat) {
+                    const grayTipContent = element.querySelector('.gray-tip-content.babble');
+                    if (grayTipContent) {
+                        // 获取拍一拍的发起者和目标
+                        const actions = grayTipContent.querySelectorAll('.gray-tip-action');
+                        if (actions.length >= 1) {
+                            const fromUser = actions[0].textContent;
+                            const toUser = actions.length >= 2 ? actions[1].textContent : null;
+                            
+                            // 如果没有特定用户配置，屏蔽所有拍一拍消息
+                            if (Object.keys(this.patUsers).length === 0) {
+                                return { blocked: true, type: 'pat' };
+                            }
+                            
+                            // 检查是否在特定用户配置中
+                            if (fromUser in this.patUsers) {
+                                const targetUsers = this.patUsers[fromUser];
+                                // 如果目标用户列表为空，屏蔽该用户的所有拍一拍消息
+                                // 否则检查目标用户是否在列表中
+                                if (targetUsers.length === 0 || (toUser && targetUsers.includes(toUser))) {
+                                    return { blocked: true, type: 'pat' };
+                                }
+                            }
+                        }
+                    }
+                }
+                return { blocked: false };
+            }
 
             // 检查普通屏蔽词
             if (message) {
@@ -745,6 +808,8 @@
                 INCLUDES_SPECIAL_BLOCKED_USERS_EMOJIS = { ...this.specialBlockedUsersEmojis };
                 INCLUDES_BLOCKED_IMAGES = Array.from(this.blockedImages);
                 MSG_ID_BLOCK_CONFIG.enabled = this.blockSuperEmoji;
+                PA_CONFIG.enabled = this.blockPat;
+                PA_CONFIG.users = this.patUsers;
 
                 const dataToSave = {
                     blockedWords: Array.from(this.blockedWords),
@@ -754,7 +819,9 @@
                     blockedEmojis: Array.from(this.blockedEmojis),
                     specialBlockedUsersEmojis: this.specialBlockedUsersEmojis,
                     blockedImages: Array.from(this.blockedImages),
-                    blockSuperEmoji: this.blockSuperEmoji
+                    blockSuperEmoji: this.blockSuperEmoji,
+                    blockPat: this.blockPat,
+                    patUsers: this.patUsers
                 };
 
                 // 使用 LiteLoader API 保存配置
@@ -777,7 +844,9 @@
                     blockedEmojis: Array.from(this.blockedEmojis),
                     specialBlockedUsersEmojis: this.specialBlockedUsersEmojis,
                     blockedImages: Array.from(this.blockedImages),
-                    blockSuperEmoji: this.blockSuperEmoji
+                    blockSuperEmoji: this.blockSuperEmoji,
+                    blockPat: this.blockPat,
+                    patUsers: this.patUsers
                 };
 
                 const jsonString = JSON.stringify(config, null, 2);
@@ -846,6 +915,12 @@
                         if (typeof config.blockSuperEmoji === 'boolean') {
                             this.blockSuperEmoji = config.blockSuperEmoji;
                         }
+                        if (typeof config.blockPat === 'boolean') {
+                            this.blockPat = config.blockPat;
+                        }
+                        if (config.patUsers) {
+                            this.patUsers = config.patUsers;
+                        }
 
                         // 保存并更新UI
                         await this.saveAllData();
@@ -868,10 +943,85 @@
             }
         }
     }
+    class MessageLogger {
+        constructor() {
+            this.messages = [];
+            this.maxMessages = 1000; // 最多保存1000条消息
+            this.loadMessages();
+        }
+
+        // 添加新消息
+        addMessage(username, content, timestamp = new Date().toISOString()) {
+            this.messages.unshift({
+                username,
+                content,
+                timestamp
+            });
+
+            // 如果消息数量超过限制，删除最旧的消息
+            if (this.messages.length > this.maxMessages) {
+                this.messages = this.messages.slice(0, this.maxMessages);
+            }
+
+            this.saveMessages();
+        }
+
+        // 获取所有消息
+        getMessages() {
+            return this.messages;
+        }
+
+        // 清除所有消息
+        clearMessages() {
+            this.messages = [];
+            this.saveMessages();
+        }
+
+        // 保存消息到本地存储
+        saveMessages() {
+            try {
+                localStorage.setItem('message_logger_data', JSON.stringify(this.messages));
+            } catch (error) {
+                console.error('Failed to save messages:', error);
+            }
+        }
+
+        // 从本地存储加载消息
+        loadMessages() {
+            try {
+                const savedMessages = localStorage.getItem('message_logger_data');
+                if (savedMessages) {
+                    this.messages = JSON.parse(savedMessages);
+                }
+            } catch (error) {
+                console.error('Failed to load messages:', error);
+                this.messages = [];
+            }
+        }
+
+        // 导出消息到文件
+        exportMessages() {
+            const data = JSON.stringify(this.messages, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `message_logs_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    }
     class MessageBlocker {
         constructor() {
-            this.targetSelector = 'div.msg-content-container, div.message-container, .message-container, .mix-message__container';
+            if (MessageBlocker.instance) {
+                return MessageBlocker.instance;
+            }
+            MessageBlocker.instance = this;
+            this.targetSelector = 'div.msg-content-container, div.message-container, .message-container, .mix-message__container, .gray-tip-message';
             this.blockedWordsManager = new BlockedWordsManager();
+            this.messageLogger = new MessageLogger(); // 添加消息记录器
             this.settingsContainer = null;
             this.initialized = false;
             this.targetEvent = null;
@@ -1009,6 +1159,20 @@
 
         replaceContent(element) {
             try {
+                // 检查是否是拍一拍消息
+                if (element.classList.contains('gray-tip-message')) {
+                    const blockResult = this.blockedWordsManager.isMessageBlocked(element, null, null, null);
+                    if (blockResult.blocked) {
+                        if (REPLACEMODE.pat) {
+                            element.textContent = REPLACEMODE.replaceword;
+                        } else {
+                            element.style.display = 'none';
+                        }
+                        return { blocked: true };
+                    }
+                    return { blocked: false };
+                }
+
                 const username = this.extractUsername(element);
                 const message = this.getMessageContent(element);
                 const emojiElements = element.querySelectorAll('.face-element, .qqemoji, .emoji');
@@ -1058,7 +1222,7 @@
                             if (REPLACEMODE.normalWords || REPLACEMODE.exactWords ||
                                 REPLACEMODE.specialUsers || REPLACEMODE.exactSpecialUsers ||
                                 REPLACEMODE.emojis || REPLACEMODE.images ||
-                                REPLACEMODE.superEmoji) {
+                                REPLACEMODE.superEmoji || REPLACEMODE.pat) {
                                 element.textContent = REPLACEMODE.replaceword;
                             } else {
                                 element.style.display = 'none';
@@ -1070,7 +1234,7 @@
                         if (REPLACEMODE.normalWords || REPLACEMODE.exactWords ||
                             REPLACEMODE.specialUsers || REPLACEMODE.exactSpecialUsers ||
                             REPLACEMODE.emojis || REPLACEMODE.images ||
-                            REPLACEMODE.superEmoji) {
+                            REPLACEMODE.superEmoji || REPLACEMODE.pat) {
                             element.textContent = REPLACEMODE.replaceword;
                         } else {
                             element.style.display = 'none';
@@ -1144,8 +1308,8 @@
             const wrapper = container.querySelector('.message-content__wrapper');
             if (!wrapper) return null;
 
-            // 获取所有文本内容
-            const textElements = wrapper.querySelectorAll('.text-normal');
+            // 获取所有文本内容，包括 @提及
+            const textElements = wrapper.querySelectorAll('.text-normal, .text-element--at');
             if (textElements.length === 0) return wrapper.textContent.trim();
 
             // 合并所有文本内容
@@ -1822,6 +1986,27 @@
                     </setting-panel>
                 `;
 
+            const patSection = document.createElement('setting-section');
+            patSection.setAttribute('data-title', '拍一拍屏蔽管理');
+            patSection.innerHTML = `
+                    <setting-panel>
+                        <setting-list data-direction="column">
+                            <setting-item data-direction="column">
+                                <div>
+                                    <setting-text>特定用户拍一拍屏蔽</setting-text>
+                                    <setting-text data-type="secondary">为特定用户设置独立的拍一拍屏蔽列表</setting-text>
+                                </div>
+                                <div class="input-group" style="margin-top: 8px;">
+                                    <input type="text" id="newPatUser" class="settings-input" placeholder="用户名">
+                                    <input type="text" id="newPatTarget" class="settings-input" placeholder="目标用户">
+                                    <button id="addPatBtn" class="add-button" style="margin-left: 8px;">添加</button>
+                                </div>
+                                <div id="patList" class="settings-list" style="margin-top: 12px;"></div>
+                            </setting-item>
+                        </setting-list>
+                    </setting-panel>
+                `;
+
             const configSection = document.createElement('setting-section');
             configSection.setAttribute('data-title', '配置管理');
             configSection.innerHTML = `
@@ -1847,6 +2032,7 @@
             container.appendChild(emojiSection);
             container.appendChild(specialEmojiSection);
             container.appendChild(blockedImagesSection);
+            container.appendChild(patSection);
             container.appendChild(configSection);
             console.log('准备添加设置界面到滚动视图');
             scrollView.appendChild(container);
@@ -2193,6 +2379,83 @@
                 });
             }
 
+            const addPatBtn = document.getElementById('addPatBtn');
+            const newPatUser = document.getElementById('newPatUser');
+            const newPatTarget = document.getElementById('newPatTarget');
+
+            if (addPatBtn && newPatUser && newPatTarget) {
+                addPatBtn.addEventListener('click', () => {
+                    const userId = newPatUser.value.trim();
+                    const target = newPatTarget.value.trim();
+
+                    if (!userId) {
+                        showToast('请输入用户名', 'error');
+                        return;
+                    }
+
+                    // 添加到用户配置
+                    if (!this.blockedWordsManager.patUsers[userId]) {
+                        this.blockedWordsManager.patUsers[userId] = [];
+                    }
+                    if (!this.blockedWordsManager.patUsers[userId].includes(target)) {
+                        this.blockedWordsManager.patUsers[userId].push(target);
+                    }
+
+                    // 保存配置
+                    this.blockedWordsManager.saveAllData();
+
+                    // 清空输入框
+                    newPatUser.value = '';
+                    newPatTarget.value = '';
+
+                    // 刷新列表
+                    this.renderPatList();
+                    showToast('添加成功');
+                });
+
+                // 添加回车键监听
+                const handlePatEnter = () => {
+                    const userId = newPatUser.value.trim();
+                    const target = newPatTarget.value.trim();
+
+                    if (!userId) {
+                        showToast('请输入用户名', 'error');
+                        return;
+                    }
+
+                    // 添加到用户配置
+                    if (!this.blockedWordsManager.patUsers[userId]) {
+                        this.blockedWordsManager.patUsers[userId] = [];
+                    }
+                    if (!this.blockedWordsManager.patUsers[userId].includes(target)) {
+                        this.blockedWordsManager.patUsers[userId].push(target);
+                    }
+
+                    // 保存配置
+                    this.blockedWordsManager.saveAllData();
+
+                    // 清空输入框
+                    newPatUser.value = '';
+                    newPatTarget.value = '';
+
+                    // 刷新列表
+                    this.renderPatList();
+                    showToast('添加成功');
+                };
+
+                newPatUser.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        handlePatEnter();
+                    }
+                });
+
+                newPatTarget.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        handlePatEnter();
+                    }
+                });
+            }
+
             // 导出配置
             const exportConfigBtn = document.getElementById('exportConfigBtn');
             if (exportConfigBtn) {
@@ -2221,7 +2484,41 @@
             this.renderEmojisList();
             this.renderSpecialEmojisList();
             this.renderBlockedImagesList();
+            this.renderPatList();
         }
+        renderPatList() {
+            const patList = document.getElementById('patList');
+            if (!patList) return;
+
+            const patHtml = Object.entries(this.blockedWordsManager.patUsers)
+                .map(([userId, targets]) => {
+                    if (!targets || targets.length === 0) return '';
+
+                    return `
+                            <div class="settings-list-item">
+                                <div>
+                                    <div>用户: ${userId}</div>
+                                    <div class="text-secondary">屏蔽目标: ${Array.from(targets).join(', ')}</div>
+                                </div>
+                                <button class="delete-button" onclick="window.messageBlocker.deletePatUser('${userId}')">删除</button>
+                            </div>
+                        `;
+                })
+                .filter(html => html)
+                .join('');
+
+            patList.innerHTML = patHtml || '<div class="settings-list-item">暂无拍一拍屏蔽配置</div>';
+        }
+
+        deletePatUser(userId) {
+            if (this.blockedWordsManager.patUsers[userId]) {
+                delete this.blockedWordsManager.patUsers[userId];
+                this.blockedWordsManager.saveAllData();
+                this.renderPatList();
+                showToast('删除成功');
+            }
+        }
+
         setupContextMenu() {
             document.addEventListener('mouseup', (event) => {
                 if (event.button === 2) { // 右键点击
@@ -2412,7 +2709,7 @@
 
     // 初始化函数
     function initializeAll() {
-        console.log('MessageBlocker 2.0.5 loaded');
+        console.log('MessageBlocker 2.0.6 loaded');
         messageBlocker = new MessageBlocker();
         window.messageBlocker = messageBlocker;
     }
