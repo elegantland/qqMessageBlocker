@@ -51,8 +51,7 @@
         //'儒雅': [], // 只屏蔽儒雅所有拍一拍消息
     };
     let USER_IMAGES = {
-        // 空对象表示屏蔽所有拍一拍消息，现在是空对象
-        //'儒雅': [], // 只屏蔽儒雅所有拍一拍消息
+        //'儒雅': [], // 只屏蔽儒雅所有图片消息
     };
     let REPLACEMODE = {
         normalWords: false,      // 普通屏蔽词是否使用替换模式
@@ -348,13 +347,15 @@
                 PA_CONFIG.enabled = this.blockPat;
                 PA_CONFIG.users = this.patUsers;
 
-                // 更新UI
-                messageBlocker.renderWordsList();
-                messageBlocker.renderSpecialUsersList();
-                messageBlocker.renderEmojisList();
-                messageBlocker.renderSpecialEmojisList();
-                messageBlocker.renderBlockedImagesList();
-                messageBlocker.renderImageBlockedUsersList();
+                // 只有在 messageBlocker 实例存在时才更新UI
+                if (window.messageBlocker) {
+                    window.messageBlocker.renderWordsList();
+                    window.messageBlocker.renderSpecialUsersList();
+                    window.messageBlocker.renderEmojisList();
+                    window.messageBlocker.renderSpecialEmojisList();
+                    window.messageBlocker.renderBlockedImagesList();
+                    window.messageBlocker.renderImageBlockedUsersList();
+                }
             } catch (error) {
                 console.error('[Message Blocker] 加载配置时出错:', error);
             }
@@ -1012,10 +1013,13 @@
             MessageBlocker.instance = this;
             this.targetSelector = 'div.msg-content-container, div.message-container, .message-container, .mix-message__container, .gray-tip-message';
             this.blockedWordsManager = new BlockedWordsManager();
-            this.messageLogger = new MessageLogger(); // 添加消息记录器
             this.settingsContainer = null;
             this.initialized = false;
             this.targetEvent = null;
+
+            // 在实例创建后再加载数据
+            this.blockedWordsManager.loadAllData();
+
             this.init();
             this.setupUI();
             this.initMenuStyles();
