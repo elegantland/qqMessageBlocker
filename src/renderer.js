@@ -3,7 +3,6 @@
     let INCLUDES_BLOCKED_WORDS = [
         //'测试111',//会屏蔽 测试111 ，也会屏蔽测试111111
         //'@AL_1S',
-        //'@幻想',
     ];
     // 完全匹配屏蔽词列表
     let EXACT_BLOCKED_WORDS = [
@@ -34,10 +33,7 @@
     // 在默认配置中添加需要屏蔽的图片特征
     let INCLUDES_BLOCKED_IMAGES = [
         //'76264f7279cd8e5e2d2c597fa68da8a2.jpg',
-        //'99205df846cac4d7d680997a0ed56a88.jpg',
         //'bae9b15fd28f626c6b08d01188dfb604.gif',
-
-        // 可以添加更多需要屏蔽的图片特征
     ];
     let MSG_ID_BLOCK_CONFIG = {
         // 是否启用 超级表情 屏蔽功能,默认true启用，关闭用false
@@ -169,8 +165,8 @@
                 specialBlockedUsers: INCLUDES_SPECIAL_BLOCKED_USERS,
                 exactSpecialBlockedUsers: EXACT_SPECIAL_BLOCKED_USERS,
                 blockedEmojis: INCLUDES_BLOCKED_EMOJIS,
-                exactBlockedEmojis: EXACT_BLOCKED_EMOJIS,  // 添加这行
-                includeBlockedEmojis: INCLUDES_BLOCKED_EMOJIS,  // 修改这行
+                exactBlockedEmojis: EXACT_BLOCKED_EMOJIS,  
+                includeBlockedEmojis: INCLUDES_BLOCKED_EMOJIS,  
                 specialBlockedUsersEmojis: INCLUDES_SPECIAL_BLOCKED_USERS_EMOJIS,
                 blockedImages: INCLUDES_BLOCKED_IMAGES,
                 blockSuperEmoji: MSG_ID_BLOCK_CONFIG.enabled,
@@ -591,7 +587,7 @@
             if (!emojiIds || emojiIds.length === 0) return false;
 
             const numericEmojiIds = emojiIds.map(id => Number(id));
-            // 修改这里：只获取文本内容，不包括表情内容
+            // 只获取文本内容，不包括表情内容
             const textContent = messageContent?.replace(/\[表情\]|\[emoji\]/g, '').trim();
             const hasOtherContent = textContent && textContent.length > 0;
 
@@ -1134,9 +1130,10 @@
                                     : Array.from(node.querySelectorAll(this.targetSelector));
 
                                 elements.forEach(element => {
-                                    // 检查是否是公众号消息
-                                    if (element.classList.contains('is-pub-account')) {
-                                        element.style.opacity = '1';  // 直接显示公众号消息
+                                    // 检查是否是公众号消息或转发消息
+                                    if (element.classList.contains('is-pub-account') || 
+                                        element.querySelector('.forward-msg')) {
+                                        element.style.opacity = '1';  // 直接显示这些消息
                                         return;
                                     }
 
