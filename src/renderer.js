@@ -1157,6 +1157,15 @@
 
         replaceContent(element) {
             try {
+                // 检查是否是系统消息（如加入群聊等）
+                if (element.classList.contains('gray-tip-message')) {
+                    // 恢复系统消息的显示
+                    requestAnimationFrame(() => {
+                        element.style.opacity = '1';
+                    });
+                    return { blocked: false };
+                }
+
                 const username = this.extractUsername(element);
                 const message = this.getMessageContent(element);
                 const emojiElements = element.querySelectorAll('.face-element, .qqemoji, .emoji');
@@ -1181,7 +1190,7 @@
                         if (REPLACEMODE[blockResult.type]) {
                             messageContainer.textContent = REPLACEMODE.replaceword;
                         } else {
-                            messageContainer.style.display = 'none';
+                            messageContainer.style.display = 'none'; // 使用 display: none 完全隐藏
                         }
                     }
                     return { blocked: true };
