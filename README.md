@@ -85,9 +85,16 @@
 - [QQ禁用更新](https://github.com/xh321/LiteLoaderQQNT-Kill-Update/tree/master) - 禁止 QQ 自动更新
 - [插件列表查看](https://github.com/ltxhhz/LL-plugin-list-viewer/tree/main) - 查看和管理插件
 - [QQ防撤回](https://github.com/xh321/LiteLoaderQQNT-Anti-Recall/tree/master) - 防止消息被撤回
+-  [MessageSave](https://github.com/elegantland/qqMessageSave) - 方便的将QQ消息保存到本地
 
 ## 📝 更新日志
-
+### v2.0.7 (2024-12-26)
+- 右键菜单优化了文本的选取和图片新加了屏蔽某人全部图片，还有把emoji表情的具体代码实现了，右键菜单变的更好用了！
+- 去掉了2.0.6版本的消息保存函数，迁移到我的新插件，欢迎体验我的新插件，假如有消息被屏蔽而你又有点想知道内容也可以在这里找到，目前还在测试中... [MessageSave](https://github.com/elegantland/qqMessageSave) 
+- 添加了屏蔽拍一拍功能，然后发现某些系统信息（xxx加入了群）这类消息显示有点问题，于是一起屏蔽了，结果发现系统消息也是必要的，目前取消了系统消息的限制，如果有人需要的话后续版本可能会添加相应逻辑但不会做到设置界面里。
+- 优化了代码的底层逻辑，精简了部分代码，方便后续的二次开发。
+- 修正了一个manifest的错误，非常感谢PR！
+  
 ### v2.0.5 (2024-11-29)
 - ✨ 新增右键菜单功能
 - 🔧 优化底层屏蔽逻辑，提升稳定性
