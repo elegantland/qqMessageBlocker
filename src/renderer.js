@@ -1,5 +1,5 @@
 (function () {
-    // 包含匹配屏蔽词列表2.0.8版�  <--不是你乱码了，不用在意
+    // 包含匹配屏蔽词列表2.0.7版�  <--不是你乱码了，不用在意
     let INCLUDES_BLOCKED_WORDS = [
         //'测试111',//会屏蔽 测试111 ，也会屏蔽测试111111
         //'@AL_1S',
@@ -481,6 +481,13 @@
         // 检查消息是否应该被屏蔽
         isMessageBlocked(element, username, message, emojiIds) {
             try {
+                // 首先检查特殊用户的完全屏蔽配置
+                if (username && 
+                    (this.specialBlockedUsers[username]?.includes('') || 
+                     INCLUDES_SPECIAL_BLOCKED_USERS[username]?.includes(''))) {
+                    return { blocked: true, type: 'specialUser' };
+                }
+
                 // 使用策略模式检查各种消息类型
                 const checks = [
                     // @消息检查
@@ -2788,7 +2795,7 @@
 
     // 初始化函数
     function initializeAll() {
-        console.log('MessageBlocker 2.0.8 loaded');
+        console.log('MessageBlocker 2.0.7 loaded');
         messageBlocker = new MessageBlocker();
         window.messageBlocker = messageBlocker;
     }
