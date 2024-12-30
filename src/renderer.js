@@ -1157,14 +1157,13 @@
                                     : Array.from(node.querySelectorAll(this.targetSelector));
 
                                 elements.forEach(element => {
-                                    // 检查是否是公众号消息或转发消息
-                                    if (element.classList.contains('is-pub-account') || 
-                                        element.querySelector('.forward-msg')) {
+                                    // 只跳过公众号消息
+                                    if (element.classList.contains('is-pub-account')) {
                                         element.style.opacity = '1';  // 直接显示这些消息
                                         return;
                                     }
 
-                                    // 处理其他消息
+                                    // 处理所有消息（包括转发消息）
                                     element.style.opacity = '0';
                                     const result = this.replaceContent(element);
                                     if (!result.blocked || result.partial) {
@@ -1199,11 +1198,11 @@
                         const message = messageParts.join(':').trim();
 
                         // 检查发送者是否被屏蔽或消息内容是否应该被屏蔽
-                        if (this.blockedWordsManager.isUserBlocked(sender) || 
-                            this.blockedWordsManager.isMessageBlocked(content, sender, message, []).blocked) {
+                        if (this.blockedWordsManager.isUserBlocked(sender.trim()) || 
+                            this.blockedWordsManager.isMessageBlocked(content, sender.trim(), message, []).blocked) {
                             // 只替换这条转发消息的内容
                             if (REPLACEMODE.normalWords) {
-                                content.textContent = REPLACEMODE.replaceword;
+                                content.textContent = `${sender}: ${REPLACEMODE.replaceword}`;
                             } else {
                                 content.style.display = 'none';
                             }
@@ -1219,9 +1218,9 @@
                                 .filter(content => content.style.display !== 'none');
                             countElement.textContent = `查看${visibleContents.length}条转发消息`;
                         }
+                        // 返回部分屏蔽状态，这样消息容器会显示出来
+                        return { blocked: true, partial: true };
                     }
-
-                    return { blocked: false }; // 不完全屏蔽转发消息
                 }
 
                 // 原有的消息处理逻辑
