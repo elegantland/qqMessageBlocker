@@ -1,5 +1,5 @@
 (function () {
-    // 包含匹配屏蔽词列表2.0.7版�  <--不是你乱码了，不用在意
+    // 包含匹配屏蔽词列表2.0.8版�  <--不是你乱码了，不用在意
     let INCLUDES_BLOCKED_WORDS = [
         //'测试111',//会屏蔽 测试111 ，也会屏蔽测试111111
         //'@AL_1S',
@@ -796,18 +796,21 @@
             // 添加表情ID
             this.specialBlockedUsersEmojis[username].push(numEmojiId);
             // 保存数据
-            this.saveAllData();
-            return true;
+            this.blockedWordsManager.saveAllData();
+            this.renderSpecialEmojisList();
+            showToast('添加成功', 'success');
+
+            // 清空输入框
+            specialEmojiUser.value = '';
+            specialEmojiId.value = '';
         }
 
         // 删除特定用户表情屏蔽
         deleteSpecialUserEmoji(username) {
-            if (this.specialBlockedUsersEmojis[username]) {
-                delete this.specialBlockedUsersEmojis[username];
-                this.saveAllData();
-                return true;
+            if (this.blockedWordsManager.deleteSpecialUserEmoji(username)) {
+                this.renderSpecialEmojisList();
+                showToast('删除成功');
             }
-            return false;
         }
 
         // 渲染特定用户表情列表
@@ -1137,42 +1140,18 @@
                 `;
             document.head.appendChild(style);
         }
-
         init() {
-            this.processExistingElements();
             this.setupObserver();
             this.setupContextMenu();
             this.initialized = true;
         }
-        processExistingElements() {
-            try {
-                const elements = document.querySelectorAll(this.targetSelector);
-                elements.forEach(element => {
-                    // 先隐藏元素
-                    element.style.opacity = '0';
-
-                    // 处理内容
-                    const result = this.replaceContent(element);
-
-                    // 如果内容没有被屏蔽或只是部分屏蔽，显示元素
-                    if (!result.blocked || result.partial) {
-                        requestAnimationFrame(() => {
-                            element.style.opacity = '1';
-                        });
-                    }
-                });
-            } catch (error) {
-                console.error('Error in processExistingElements:', error);
-            }
-        }
-
         setupObserver() {
-            const config = { childList: true, subtree: true };
-            const observer = new MutationObserver((mutations) => {
+            const messageObserver = new MutationObserver((mutations) => {
                 for (const mutation of mutations) {
                     if (mutation.type === 'childList') {
                         for (const node of mutation.addedNodes) {
                             if (node.nodeType === Node.ELEMENT_NODE) {
+                                // 处理消息内容
                                 const elements = node.matches(this.targetSelector)
                                     ? [node]
                                     : Array.from(node.querySelectorAll(this.targetSelector));
@@ -1200,11 +1179,52 @@
                 }
             });
 
-            observer.observe(document.body, config);
+            // 开始观察
+            messageObserver.observe(document.body, { childList: true, subtree: true });
         }
 
         replaceContent(element) {
             try {
+                // 检查是否是转发消息
+                const forwardMsg = element.querySelector('.forward-msg');
+                if (forwardMsg) {
+                    // 获取所有转发的内容
+                    const contents = Array.from(forwardMsg.querySelectorAll('.fwd-content'));
+                    let hasBlockedContent = false;
+
+                    contents.forEach(content => {
+                        const text = content.textContent;
+                        // 分离发送者和消息内容
+                        const [sender, ...messageParts] = text.split(':');
+                        const message = messageParts.join(':').trim();
+
+                        // 检查发送者是否被屏蔽或消息内容是否应该被屏蔽
+                        if (this.blockedWordsManager.isUserBlocked(sender) || 
+                            this.blockedWordsManager.isMessageBlocked(content, sender, message, []).blocked) {
+                            // 只替换这条转发消息的内容
+                            if (REPLACEMODE.normalWords) {
+                                content.textContent = REPLACEMODE.replaceword;
+                            } else {
+                                content.style.display = 'none';
+                            }
+                            hasBlockedContent = true;
+                        }
+                    });
+
+                    // 如果有内容被屏蔽，更新转发消息的计数
+                    if (hasBlockedContent) {
+                        const countElement = forwardMsg.querySelector('.count');
+                        if (countElement) {
+                            const visibleContents = Array.from(forwardMsg.querySelectorAll('.fwd-content'))
+                                .filter(content => content.style.display !== 'none');
+                            countElement.textContent = `查看${visibleContents.length}条转发消息`;
+                        }
+                    }
+
+                    return { blocked: false }; // 不完全屏蔽转发消息
+                }
+
+                // 原有的消息处理逻辑
                 const username = this.extractUsername(element);
                 const message = this.getMessageContent(element);
                 const emojiElements = element.querySelectorAll('.face-element, .qqemoji, .emoji');
@@ -2795,7 +2815,7 @@
 
     // 初始化函数
     function initializeAll() {
-        console.log('MessageBlocker 2.0.7 loaded');
+        console.log('MessageBlocker 2.0.8 loaded');
         messageBlocker = new MessageBlocker();
         window.messageBlocker = messageBlocker;
     }
