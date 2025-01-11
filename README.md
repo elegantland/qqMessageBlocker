@@ -1,5 +1,5 @@
 ![qqMessageBlocker](https://socialify.git.ci/elegantland/qqMessageBlocker/image?description=1&forks=1&issues=1&language=1&name=1&stargazers=1&theme=Light)
-依然需要大家的提供更好的关于新功能的想法！如果遇到问题我很乐意解决。
+一个LiteLoaderQQNT 插件，依然需要大家的提供更好的关于新功能的想法！如果遇到问题我很乐意解决。
 
 问题反馈&需要帮助：直接提issue或者2543971286@qq.com 
 
