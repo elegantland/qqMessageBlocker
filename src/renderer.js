@@ -2771,7 +2771,7 @@
         deleteImageBlockedUser(username) {
             if (this.blockedWordsManager.removeImageBlockedUser(username)) {
                 this.renderImageBlockedUsersList();
-                showToast('除成功');
+                showToast('删除成功');
             }
         }
 
