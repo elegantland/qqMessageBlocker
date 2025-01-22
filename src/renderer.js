@@ -63,7 +63,7 @@
         specialUsers: false,     // 特殊用户屏蔽词是否使用替换模式
         exactSpecialUsers: false,// 特殊用户完全匹配是否使用替换模式
         emojis: false,         // 表情是否使用替换模式
-        images: false,         // 图片是否使用替换模式
+        images: true,         // 图片是否使用替换模式
         superEmoji: false,      // 超级表情是否使用替换模式
         publicMessage: false,    // 公共消息是否使用替换模式
         replaceword: "[已屏蔽]" // 替换词
@@ -831,7 +831,8 @@
         }
         exportConfig() {
             try {
-                const config = {
+                // 准备要导出的配置数据
+                const configData = {
                     blockedWords: Array.from(this.blockedWords),
                     exactBlockedWords: Array.from(this.exactBlockedWords),
                     specialBlockedUsers: this.specialBlockedUsers,
@@ -841,26 +842,36 @@
                     includeBlockedEmojis: Array.from(this.includeBlockedEmojis),
                     specialBlockedUsersEmojis: this.specialBlockedUsersEmojis,
                     blockedImages: Array.from(this.blockedImages),
+                    blockSuperEmoji: this.blockSuperEmoji,
+                    blockPublicMessage: this.blockPublicMessage,
                     publicMessageKeywords: Array.from(this.publicMessageKeywords),
-                    userImages: USER_IMAGES
+                    blockInteractionMessage: this.blockInteractionMessage,
+                    userImages: USER_IMAGES,
+                    atMessageBlock: MSG_AT_BLOCK_CONFIG.enabled,
+                    replaceMode: REPLACEMODE
                 };
 
-                const jsonString = JSON.stringify(config, null, 2);
-                const blob = new Blob([jsonString], { type: 'application/json' });
+                // 创建 Blob 对象
+                const blob = new Blob([JSON.stringify(configData, null, 2)], { type: 'application/json' });
+                
+                // 创建下载链接
                 const url = URL.createObjectURL(blob);
-
                 const a = document.createElement('a');
                 a.href = url;
                 a.download = 'message_blocker_config.json';
+                
+                // 触发下载
                 document.body.appendChild(a);
                 a.click();
+                
+                // 清理
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
-
+                
                 showToast('配置导出成功', 'success');
             } catch (error) {
                 console.error('导出配置时出错:', error);
-                showToast('配置导出失败', 'error');
+                showToast('导出配置失败', 'error');
             }
         }
         importConfig(file) {
@@ -2363,6 +2374,15 @@
                     }
                 });
             }
+
+            // 添加导出配置按钮的事件监听
+            const exportConfigBtn = document.getElementById('exportConfigBtn');
+            if (exportConfigBtn) {
+                exportConfigBtn.addEventListener('click', () => {
+                    // 调用 blockedWordsManager 的 exportConfig 方法
+                    this.blockedWordsManager.exportConfig();
+                });
+            }
         }
 
         setupContextMenu() {
@@ -2553,6 +2573,15 @@
             this.updateThemeVariables();
             // 添加事件监听器
             this.addEventListeners();
+
+            // 添加导出配置按钮的事件监听
+            const exportConfigBtn = document.getElementById('exportConfigBtn');
+            if (exportConfigBtn) {
+                exportConfigBtn.addEventListener('click', () => {
+                    // 调用 blockedWordsManager 的 exportConfig 方法
+                    this.blockedWordsManager.exportConfig();
+                });
+            }
         }
 
         initThemeVariables() {
