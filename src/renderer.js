@@ -17,7 +17,7 @@
     };
     // 完全匹配特殊屏蔽用户配置
     let EXACT_SPECIAL_BLOCKED_USERS = {
-        //'AL_1S': ['',],
+        //'儒雅': ['测试444'],
     };
     // 包含匹配屏蔽表情ID
     let INCLUDES_BLOCKED_EMOJIS = [];  // 默认屏蔽的表情ID
@@ -862,7 +862,7 @@
 
             this.specialEmojisRenderer = new ListRenderer({
                 listElement: specialEmojisList,
-                dataSource: Object.entries(this.blockedWordsManager.specialBlockedUsersEmojis).reverse(), // 反转数据源
+                dataSource: Object.entries(this.blockedWordsManager.specialBlockedUsersEmojis).reverse(),
                 itemTemplate: ([username, emojiIds]) => {
                     if (!emojiIds || emojiIds.length === 0) return '';
 
@@ -1420,7 +1420,7 @@
                 const allIncludesUsers = { ...INCLUDES_SPECIAL_BLOCKED_USERS, ...this.blockedWordsManager.specialBlockedUsers };
                 this.includesUsersRenderer = new ListRenderer({
                     listElement: includesUsersList,
-                    dataSource: Object.entries(allIncludesUsers).reverse(), // 反转数据源
+                    dataSource: Object.entries(allIncludesUsers).reverse(),
                     itemTemplate: ([userId, words]) => {
                         const wordsList = Array.isArray(words) ? words : [];
                         const displayWords = wordsList.map(word => word === '' ? '[屏蔽所有消息]' : word).filter(Boolean);
@@ -1445,7 +1445,7 @@
                 const allExactUsers = { ...EXACT_SPECIAL_BLOCKED_USERS, ...this.blockedWordsManager.exactSpecialBlockedUsers };
                 this.exactUsersRenderer = new ListRenderer({
                     listElement: exactUsersList,
-                    dataSource: Object.entries(allExactUsers).reverse(), // 反转数据源
+                    dataSource: Object.entries(allExactUsers).reverse(),
                     itemTemplate: ([userId, words]) => {
                         const wordsList = Array.isArray(words) ? words : [];
                         const displayWords = wordsList.map(word => word === '' ? '[屏蔽所有消息]' : word).filter(Boolean);
@@ -1505,7 +1505,7 @@
 
             this.specialEmojisRenderer = new ListRenderer({
                 listElement: specialEmojisList,
-                dataSource: Object.entries(this.blockedWordsManager.specialBlockedUsersEmojis).reverse(), // 反转数据源
+                dataSource: Object.entries(this.blockedWordsManager.specialBlockedUsersEmojis).reverse(),
                 itemTemplate: ([username, emojiIds]) => {
                     if (!emojiIds || emojiIds.length === 0) return '';
 
@@ -1529,7 +1529,7 @@
 
             this.imagesRenderer = new ListRenderer({
                 listElement: imagesList,
-                dataSource: Array.from(this.blockedWordsManager.blockedImages).filter(pattern => pattern.trim()).reverse(), // 反转数据源
+                dataSource: Array.from(this.blockedWordsManager.blockedImages).filter(pattern => pattern.trim()).reverse(),
                 itemTemplate: (pattern) => `
                     <div class="settings-list-item" ondblclick="window.messageBlocker.copyText('${pattern.replace(/'/g, '\\\'').replace(/"/g, '\\"')}')">
                         <div>
@@ -2799,7 +2799,7 @@
 
             // 将 USER_IMAGES 转换为数组并按插入顺序反转
             const usersHtml = Object.keys(USER_IMAGES)
-                .reverse() // 反转数据源
+                .reverse()
                 .map(username => {
                     return `
                         <div class="settings-list-item">
@@ -2833,7 +2833,7 @@
             }
 
             const keywordsHtml = Array.from(this.blockedWordsManager.publicMessageKeywords)
-                .reverse() // 反转数据源
+                .reverse()
                 .map(keyword => {
                     const encodedKeyword = keyword.replace(/'/g, '\\\'').replace(/"/g, '\\"');
                     return `
