@@ -17,7 +17,7 @@
     };
     // 完全匹配特殊屏蔽用户配置
     let EXACT_SPECIAL_BLOCKED_USERS = {
-        //'儒雅': ['测试444'],
+        //'AL_1S': ['',],
     };
     // 包含匹配屏蔽表情ID
     let INCLUDES_BLOCKED_EMOJIS = [];  // 默认屏蔽的表情ID
@@ -860,24 +860,24 @@
             const specialEmojisList = document.getElementById('specialEmojisList');
             if (!specialEmojisList) return;
 
-            const specialEmojisHtml = Object.entries(this.specialBlockedUsersEmojis)
-                .map(([username, emojiIds]) => {
+            this.specialEmojisRenderer = new ListRenderer({
+                listElement: specialEmojisList,
+                dataSource: Object.entries(this.blockedWordsManager.specialBlockedUsersEmojis).reverse(), // 反转数据源
+                itemTemplate: ([username, emojiIds]) => {
                     if (!emojiIds || emojiIds.length === 0) return '';
 
                     return `
-                            <div class="settings-list-item">
-                                <div>
-                                    <div>用户: ${username}</div>
-                                    <div class="text-secondary">屏蔽表情: ${Array.from(emojiIds).join(', ')}</div>
-                                </div>
-                                <button class="delete-button" onclick="window.messageBlocker.deleteSpecialUserEmoji('${username}')">删除</button>
+                        <div class="settings-list-item">
+                            <div>
+                                <div>用户: ${username}</div>
+                                <div class="text-secondary">屏蔽表情: ${Array.from(emojiIds).join(', ')}</div>
                             </div>
-                        `;
-                })
-                .filter(html => html)
-                .join('');
-
-            specialEmojisList.innerHTML = specialEmojisHtml || '<div class="settings-list-item">暂无特定用户表情屏蔽配置</div>';
+                            <button class="delete-button" onclick="window.messageBlocker.deleteSpecialUserEmoji('${username}')">删除</button>
+                        </div>
+                    `;
+                }
+            });
+            this.specialEmojisRenderer.render();
         }
 
         // 添加导出配置方法
@@ -1383,47 +1383,31 @@
             const exactWordsList = document.getElementById('exactBlockedWordsList');
 
             if (blockedWordsList) {
-                blockedWordsList.innerHTML = Array.from(this.blockedWordsManager.blockedWords)
-                    .map(word => {
-                        const encodedWord = word.replace(/'/g, '\\\'').replace(/"/g, '\\"');
-                        return `
-                                <div class="settings-list-item" ondblclick="window.messageBlocker.copyText('${encodedWord}')">
-                                    <span>${word}</span>
-                                    <button class="delete-button" onclick="window.messageBlocker.deleteWord('${encodedWord}')">删除</button>
-                                </div>
-                            `;
-                    })
-                    .join('');
+                this.blockedWordsRenderer = new ListRenderer({
+                    listElement: blockedWordsList,
+                    dataSource: Array.from(this.blockedWordsManager.blockedWords).reverse(),
+                    itemTemplate: (word) => `
+                        <div class="settings-list-item" ondblclick="window.messageBlocker.copyText('${word.replace(/'/g, '\\\'').replace(/"/g, '\\"')}')">
+                            <span>${word}</span>
+                            <button class="delete-button" onclick="window.messageBlocker.deleteWord('${word.replace(/'/g, '\\\'').replace(/"/g, '\\"')}')">删除</button>
+                        </div>
+                    `
+                });
+                this.blockedWordsRenderer.render();
             }
 
             if (exactWordsList) {
-                exactWordsList.innerHTML = '';
-                Array.from(this.blockedWordsManager.exactBlockedWords).forEach(word => {
-                    const item = document.createElement('div');
-                    item.className = 'settings-list-item';
-
-                    // 用pre标签显示文本
-                    const pre = document.createElement('pre');
-                    pre.style.margin = '0';
-                    pre.style.fontFamily = 'inherit';
-                    pre.style.whiteSpace = 'pre-wrap';
-                    pre.textContent = word;
-                    item.appendChild(pre);
-
-                    // 创建删除按钮
-                    const deleteBtn = document.createElement('button');
-                    deleteBtn.className = 'delete-button';
-                    deleteBtn.textContent = '删除';
-                    deleteBtn.onclick = () => {
-                        this.blockedWordsManager.removeBlockedWord(word, 'exact');
-                        this.blockedWordsManager.saveAllData();
-                        this.renderWordsList();
-                        showToast(`已删除完全匹配屏蔽词: ${word}`, 'success');
-                    };
-                    item.appendChild(deleteBtn);
-
-                    exactWordsList.appendChild(item);
+                this.exactWordsRenderer = new ListRenderer({
+                    listElement: exactWordsList,
+                    dataSource: Array.from(this.blockedWordsManager.exactBlockedWords).reverse(),
+                    itemTemplate: (word) => `
+                        <div class="settings-list-item">
+                            <pre style="margin: 0; font-family: inherit; white-space: pre-wrap;">${word}</pre>
+                            <button class="delete-button" onclick="window.messageBlocker.deleteExactWord('${word.replace(/'/g, '\\\'').replace(/"/g, '\\"')}')">删除</button>
+                        </div>
+                    `
                 });
+                this.exactWordsRenderer.render();
             }
         }
 
@@ -1433,82 +1417,52 @@
 
             // 渲染包含匹配的特殊用户配置
             if (includesUsersList) {
-                // 合并默认配置和用户配置
                 const allIncludesUsers = { ...INCLUDES_SPECIAL_BLOCKED_USERS, ...this.blockedWordsManager.specialBlockedUsers };
-
-                const includesHtml = Object.entries(allIncludesUsers)
-                    .map(([userId, words]) => {
-                        // 确保words是数组
+                this.includesUsersRenderer = new ListRenderer({
+                    listElement: includesUsersList,
+                    dataSource: Object.entries(allIncludesUsers).reverse(), // 反转数据源
+                    itemTemplate: ([userId, words]) => {
                         const wordsList = Array.isArray(words) ? words : [];
+                        const displayWords = wordsList.map(word => word === '' ? '[屏蔽所有消息]' : word).filter(Boolean);
+                        if (displayWords.length === 0) return '';
 
-                        const encodedUserId = userId.replace(/'/g, '\\\'').replace(/"/g, '\\"');
-
-                        // 处理显示文本
-                        const displayWords = wordsList.map(word => {
-                            if (word === '') {
-                                return '[屏蔽所有消息]';
-                            }
-                            return word;
-                        }).filter(word => word !== undefined);
-
-                        // 如果有任何有效的屏蔽词（包括空字符串），就显示这个用户
-                        if (displayWords.length > 0) {
-                            return `
-                                    <div class="settings-list-item">
-                                        <div>
-                                            <div>用户: ${userId}</div>
-                                            <div class="text-secondary">屏蔽词: ${displayWords.join(', ')}</div>
-                                        </div>
-                                        <button class="delete-button" onclick="window.messageBlocker.deleteSpecialUser('${encodedUserId}', 'includes')">删除</button>
-                                    </div>
-                                `;
-                        }
-                        return '';
-                    })
-                    .filter(html => html) // 过滤掉空字符串
-                    .join('');
-
-                includesUsersList.innerHTML = includesHtml || '<div class="settings-list-item">暂无包含匹配的特殊用户配置</div>';
+                        return `
+                            <div class="settings-list-item">
+                                <div>
+                                    <div>用户: ${userId}</div>
+                                    <div class="text-secondary">屏蔽词: ${displayWords.join(', ')}</div>
+                                </div>
+                                <button class="delete-button" onclick="window.messageBlocker.deleteSpecialUser('${userId.replace(/'/g, '\\\'').replace(/"/g, '\\"')}', 'includes')">删除</button>
+                            </div>
+                        `;
+                    }
+                });
+                this.includesUsersRenderer.render();
             }
 
             // 渲染完全匹配的特殊用户配置
             if (exactUsersList) {
-                // 合并默认配置和用户配置
                 const allExactUsers = { ...EXACT_SPECIAL_BLOCKED_USERS, ...this.blockedWordsManager.exactSpecialBlockedUsers };
-
-                const exactHtml = Object.entries(allExactUsers)
-                    .map(([userId, words]) => {
-                        // 确保words是数组
+                this.exactUsersRenderer = new ListRenderer({
+                    listElement: exactUsersList,
+                    dataSource: Object.entries(allExactUsers).reverse(), // 反转数据源
+                    itemTemplate: ([userId, words]) => {
                         const wordsList = Array.isArray(words) ? words : [];
+                        const displayWords = wordsList.map(word => word === '' ? '[屏蔽所有消息]' : word).filter(Boolean);
+                        if (displayWords.length === 0) return '';
 
-                        const encodedUserId = userId.replace(/'/g, '\\\'').replace(/"/g, '\\"');
-
-                        // 处理显示文本
-                        const displayWords = wordsList.map(word => {
-                            if (word === '') {
-                                return '[屏蔽所有消息]';
-                            }
-                            return word;
-                        }).filter(word => word !== undefined);
-
-                        // 如果有任何有效的屏蔽词（包括空字符串），就显示这个用户
-                        if (displayWords.length > 0) {
-                            return `
-                                    <div class="settings-list-item">
-                                        <div>
-                                            <div>用户: ${userId}</div>
-                                            <div class="text-secondary">屏蔽词: ${displayWords.join(', ')}</div>
-                                        </div>
-                                        <button class="delete-button" onclick="window.messageBlocker.deleteSpecialUser('${encodedUserId}', 'exact')">删除</button>
-                                    </div>
-                                `;
-                        }
-                        return '';
-                    })
-                    .filter(html => html) // 过滤掉空字符串
-                    .join('');
-
-                exactUsersList.innerHTML = exactHtml || '<div class="settings-list-item">暂无完全匹配的特殊用户配置</div>';
+                        return `
+                            <div class="settings-list-item">
+                                <div>
+                                    <div>用户: ${userId}</div>
+                                    <div class="text-secondary">屏蔽词: ${displayWords.join(', ')}</div>
+                                </div>
+                                <button class="delete-button" onclick="window.messageBlocker.deleteSpecialUser('${userId.replace(/'/g, '\\\'').replace(/"/g, '\\"')}', 'exact')">删除</button>
+                            </div>
+                        `;
+                    }
+                });
+                this.exactUsersRenderer.render();
             }
         }
 
@@ -1517,39 +1471,31 @@
             const includeEmojisList = document.getElementById('includeEmojisList');
 
             if (exactEmojisList) {
-                const exactEmojisHtml = Array.from(this.blockedWordsManager.exactBlockedEmojis)
-                    .sort((a, b) => a - b)
-                    .map(emojiId => {
-                        return `
-                            <div class="settings-list-item" ondblclick="window.messageBlocker.copyText(${emojiId})">
-                                <div>
-                                    <div>表情ID: ${emojiId}</div>
-                                </div>
-                                <button class="delete-button" onclick="window.messageBlocker.deleteEmoji(${emojiId}, 'exact')">删除</button>
-                            </div>
-                        `;
-                    })
-                    .join('');
-
-                exactEmojisList.innerHTML = exactEmojisHtml || '<div class="settings-list-item">暂无完全匹配表情屏蔽配置</div>';
+                this.exactEmojisRenderer = new ListRenderer({
+                    listElement: exactEmojisList,
+                    dataSource: Array.from(this.blockedWordsManager.exactBlockedEmojis).reverse(),
+                    itemTemplate: (emojiId) => `
+                        <div class="settings-list-item" ondblclick="window.messageBlocker.copyText(${emojiId})">
+                            <div>表情ID: ${emojiId}</div>
+                            <button class="delete-button" onclick="window.messageBlocker.deleteEmoji(${emojiId}, 'exact')">删除</button>
+                        </div>
+                    `
+                });
+                this.exactEmojisRenderer.render();
             }
 
             if (includeEmojisList) {
-                const includeEmojisHtml = Array.from(this.blockedWordsManager.includeBlockedEmojis)
-                    .sort((a, b) => a - b)
-                    .map(emojiId => {
-                        return `
-                            <div class="settings-list-item" ondblclick="window.messageBlocker.copyText(${emojiId})">
-                                <div>
-                                    <div>表情ID: ${emojiId}</div>
-                                </div>
-                                <button class="delete-button" onclick="window.messageBlocker.deleteEmoji(${emojiId}, 'include')">删除</button>
-                            </div>
-                        `;
-                    })
-                    .join('');
-
-                includeEmojisList.innerHTML = includeEmojisHtml || '<div class="settings-list-item">暂无包含匹配表情屏蔽配置</div>';
+                this.includeEmojisRenderer = new ListRenderer({
+                    listElement: includeEmojisList,
+                    dataSource: Array.from(this.blockedWordsManager.includeBlockedEmojis).reverse(),
+                    itemTemplate: (emojiId) => `
+                        <div class="settings-list-item" ondblclick="window.messageBlocker.copyText(${emojiId})">
+                            <div>表情ID: ${emojiId}</div>
+                            <button class="delete-button" onclick="window.messageBlocker.deleteEmoji(${emojiId}, 'include')">删除</button>
+                        </div>
+                    `
+                });
+                this.includeEmojisRenderer.render();
             }
         }
 
@@ -1557,46 +1503,43 @@
             const specialEmojisList = document.getElementById('specialEmojisList');
             if (!specialEmojisList) return;
 
-            const specialEmojisHtml = Object.entries(this.blockedWordsManager.specialBlockedUsersEmojis)
-                .map(([username, emojiIds]) => {
+            this.specialEmojisRenderer = new ListRenderer({
+                listElement: specialEmojisList,
+                dataSource: Object.entries(this.blockedWordsManager.specialBlockedUsersEmojis).reverse(), // 反转数据源
+                itemTemplate: ([username, emojiIds]) => {
                     if (!emojiIds || emojiIds.length === 0) return '';
 
                     return `
-                            <div class="settings-list-item">
-                                <div>
-                                    <div>用户: ${username}</div>
-                                    <div class="text-secondary">屏蔽表情: ${Array.from(emojiIds).join(', ')}</div>
-                                </div>
-                                <button class="delete-button" onclick="window.messageBlocker.deleteSpecialUserEmoji('${username}')">删除</button>
+                        <div class="settings-list-item">
+                            <div>
+                                <div>用户: ${username}</div>
+                                <div class="text-secondary">屏蔽表情: ${Array.from(emojiIds).join(', ')}</div>
                             </div>
-                        `;
-                })
-                .filter(html => html)
-                .join('');
-
-            specialEmojisList.innerHTML = specialEmojisHtml || '<div class="settings-list-item">暂无特定用户表情屏蔽配置</div>';
+                            <button class="delete-button" onclick="window.messageBlocker.deleteSpecialUserEmoji('${username}')">删除</button>
+                        </div>
+                    `;
+                }
+            });
+            this.specialEmojisRenderer.render();
         }
 
         renderBlockedImagesList() {
             const imagesList = document.getElementById('imagesList');
             if (!imagesList) return;
 
-            const imagesHtml = Array.from(this.blockedWordsManager.blockedImages)
-                .filter(pattern => pattern.trim())
-                .map(pattern => {
-                    const encodedPattern = pattern.replace(/'/g, '\\\'').replace(/"/g, '\\"');
-                    return `
-                            <div class="settings-list-item" ondblclick="window.messageBlocker.copyText('${encodedPattern}')">
-                                <div>
-                                    <div>文件名特征: ${pattern}</div>
-                                </div>
-                                <button class="delete-button" onclick="window.messageBlocker.deleteBlockedImage('${encodedPattern}')">删除</button>
-                            </div>
-                        `;
-                })
-                .join('');
-
-            imagesList.innerHTML = imagesHtml || '<div class="settings-list-item">暂无图片屏蔽配置</div>';
+            this.imagesRenderer = new ListRenderer({
+                listElement: imagesList,
+                dataSource: Array.from(this.blockedWordsManager.blockedImages).filter(pattern => pattern.trim()).reverse(), // 反转数据源
+                itemTemplate: (pattern) => `
+                    <div class="settings-list-item" ondblclick="window.messageBlocker.copyText('${pattern.replace(/'/g, '\\\'').replace(/"/g, '\\"')}')">
+                        <div>
+                            <div>文件名特征: ${pattern}</div>
+                        </div>
+                        <button class="delete-button" onclick="window.messageBlocker.deleteBlockedImage('${pattern.replace(/'/g, '\\\'').replace(/"/g, '\\"')}')">删除</button>
+                    </div>
+                `
+            });
+            this.imagesRenderer.render();
         }
 
         deleteWord(word) {
@@ -2229,7 +2172,7 @@
             const newExactSpecialBlockWord = document.getElementById('newExactSpecialBlockWord');
             if (addExactSpecialUserBtn && newExactSpecialBlockUser && newExactSpecialBlockWord) {
                 addExactSpecialUserBtn.addEventListener('click', () => {
-                    const userId = newExactSpecialBlockUser.value.trim();
+                    const userId = String(newExactSpecialBlockUser.value.trim());
                     const word = newExactSpecialBlockWord.value.trim();
 
                     if (!userId) {
@@ -2259,7 +2202,7 @@
 
                 // 添加回车键监听
                 const handleExactSpecialUserEnter = () => {
-                    const userId = newExactSpecialBlockUser.value.trim();
+                    const userId = String(newExactSpecialBlockUser.value.trim());
                     const word = newExactSpecialBlockWord.value.trim();
 
                     if (!userId) {
@@ -2593,6 +2536,22 @@
                     this.blockedWordsManager.exportConfig();
                 });
             }
+
+            const updateButton = document.createElement('button');
+            updateButton.id = 'updateCheckBtn';
+            updateButton.className = 'add-button';
+            updateButton.textContent = '去github查看更新';
+            updateButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                // 使用 LiteLoader 的官方 API 打开外部链接
+                LiteLoader.api.openExternal('https://github.com/elegantland/qqMessageBlocker/blob/main/SECURITY.md');
+            });
+
+            // 将按钮添加到配置管理界面的按钮组中
+            const configButtonGroup = document.querySelector('setting-section[data-title="配置管理"] .input-group');
+            if (configButtonGroup) {
+                configButtonGroup.appendChild(updateButton);
+            }
         }
 
         setupContextMenu() {
@@ -2789,8 +2748,18 @@
         }
 
         initThemeVariables() {
-            // 添加主题变量样式
             const style = document.createElement('style');
+
+
+            style.textContent = `
+                @font-face {
+                    font-family: 'Apple Braille';
+                    src: url('fonts/Apple Braille.564774f87e20c96dd705.ttf') format('truetype');
+                    font-display: swap; /* 优化字体加载 */
+                }
+            `;
+
+
             document.head.appendChild(style);
 
             // 监听主题变化
@@ -2828,7 +2797,9 @@
             const imageUsersList = document.getElementById('imageBlockedUsersList');
             if (!imageUsersList) return;
 
+            // 将 USER_IMAGES 转换为数组并按插入顺序反转
             const usersHtml = Object.keys(USER_IMAGES)
+                .reverse() // 反转数据源
                 .map(username => {
                     return `
                         <div class="settings-list-item">
@@ -2843,11 +2814,12 @@
                 .join('');
 
             imageUsersList.innerHTML = usersHtml || '<div class="settings-list-item">暂无图片屏蔽用户配置</div>';
+            this.addToggleButton(imageUsersList); // 添加展开/收起按钮
         }
 
         deleteImageBlockedUser(username) {
             if (this.blockedWordsManager.removeImageBlockedUser(username)) {
-                this.renderImageBlockedUsersList();
+                this.renderImageBlockedUsersList(); // 重新渲染列表
                 showToast('删除成功');
             }
         }
@@ -2861,6 +2833,7 @@
             }
 
             const keywordsHtml = Array.from(this.blockedWordsManager.publicMessageKeywords)
+                .reverse() // 反转数据源
                 .map(keyword => {
                     const encodedKeyword = keyword.replace(/'/g, '\\\'').replace(/"/g, '\\"');
                     return `
@@ -2884,6 +2857,37 @@
                 showToast('删除成功');
             }
         }
+
+        // 通用的展开/收起功能
+        addToggleButton(listElement, maxItems = 5) {
+            // 移除所有已有的展开按钮
+            const existingButtons = listElement.parentNode.querySelectorAll('.add-button[data-toggle="expand"]');
+            existingButtons.forEach(button => button.remove());
+
+            const items = listElement.querySelectorAll('.settings-list-item');
+            if (items.length > maxItems) {
+                for (let i = maxItems; i < items.length; i++) {
+                    items[i].style.display = 'none'; // 隐藏超出部分
+                }
+
+                // 添加展开/收起按钮
+                const toggleButton = document.createElement('button');
+                toggleButton.className = 'add-button';
+                toggleButton.setAttribute('data-toggle', 'expand'); // 添加标识
+                toggleButton.textContent = '展开更多';
+                toggleButton.style.marginTop = '8px';
+                toggleButton.addEventListener('click', () => {
+                    const isExpanded = toggleButton.textContent === '展开更多';
+                    for (let i = maxItems; i < items.length; i++) {
+                        items[i].style.display = isExpanded ? 'flex' : 'none'; // 切换显示状态
+                    }
+                    toggleButton.textContent = isExpanded ? '收起' : '展开更多';
+                });
+
+                // 将按钮添加到列表下方
+                listElement.parentNode.insertBefore(toggleButton, listElement.nextSibling);
+            }
+        }
     }
     let messageBlocker = null;
 
@@ -2901,3 +2905,54 @@
         initializeAll();
     }
 })();
+
+class ListRenderer {
+    constructor(options) {
+        this.listElement = options.listElement; // 列表容器
+        this.dataSource = options.dataSource; // 数据源
+        this.itemTemplate = options.itemTemplate; // 列表项模板
+        this.maxItems = options.maxItems || 5; // 默认显示的最大项数
+        this.onDelete = options.onDelete; // 删除回调
+    }
+
+    // 渲染列表
+    render() {
+        if (!this.listElement) return;
+
+        const itemsHtml = this.dataSource
+            .map((item, index) => this.itemTemplate(item, index))
+            .join('');
+
+        this.listElement.innerHTML = itemsHtml || '<div class="settings-list-item">暂无配置</div>';
+        this.addToggleButton();
+    }
+
+    // 添加展开/收起按钮
+    addToggleButton() {
+        // 移除所有已有的展开按钮
+        const existingButtons = this.listElement.parentNode.querySelectorAll('.add-button[data-toggle="expand"]');
+        existingButtons.forEach(button => button.remove());
+
+        const items = this.listElement.querySelectorAll('.settings-list-item');
+        if (items.length > this.maxItems) {
+            for (let i = this.maxItems; i < items.length; i++) {
+                items[i].style.display = 'none';
+            }
+
+            const toggleButton = document.createElement('button');
+            toggleButton.className = 'add-button';
+            toggleButton.setAttribute('data-toggle', 'expand');
+            toggleButton.textContent = '展开更多';
+            toggleButton.style.marginTop = '8px';
+            toggleButton.addEventListener('click', () => {
+                const isExpanded = toggleButton.textContent === '展开更多';
+                for (let i = this.maxItems; i < items.length; i++) {
+                    items[i].style.display = isExpanded ? 'flex' : 'none';
+                }
+                toggleButton.textContent = isExpanded ? '收起' : '展开更多';
+            });
+
+            this.listElement.parentNode.insertBefore(toggleButton, this.listElement.nextSibling);
+        }
+    }
+}
