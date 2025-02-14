@@ -66,7 +66,7 @@
         images: false,         // 图片是否使用替换模式
         superEmoji: false,      // 超级表情是否使用替换模式
         publicMessage: false,    // 公共消息是否使用替换模式
-        replaceword: "[已屏蔽]" // 替换词
+        replaceword: "[已屏蔽]" // 替换词，替换后效果很丑
     };
 
     // Toast 通知管理类
