@@ -1122,7 +1122,7 @@
             try {
                 await new Promise(resolve => setTimeout(resolve, 20000));
                 const today = new Date().toISOString().split('T')[0];
-                const storageKey = 'lastLoginCheck';
+                const storageKey = 'checkFirstTime';
                 const lastCheck = localStorage.getItem(storageKey);
                 if (lastCheck !== today) {
                     const avatarElement = document.querySelector('.user-avatar, .avatar.user-avatar, [aria-label="昵称"]');
@@ -1266,7 +1266,6 @@
                                         }
                                     };
 
-                                    // 开始检查
                                     checkLottie();
                                 });
                             }
@@ -2048,7 +2047,6 @@
             container.insertBefore(imageBlockedUsersSection, blockedImagesSection);
             scrollView.appendChild(container);
 
-            // Add event listeners for the add buttons
             const addBlockedWordBtn = document.getElementById('addBlockedWord');
             const newBlockWordInput = document.getElementById('newBlockWord');
             if (addBlockedWordBtn && newBlockWordInput) {
@@ -2916,7 +2914,6 @@
                     toggleButton.textContent = isExpanded ? '收起' : '展开更多';
                 });
 
-                // 将按钮添加到列表下方
                 listElement.parentNode.insertBefore(toggleButton, listElement.nextSibling);
             }
         }
@@ -2946,8 +2943,6 @@ class ListRenderer {
         this.maxItems = options.maxItems || 5; // 默认显示的最大项数
         this.onDelete = options.onDelete; // 删除回调
     }
-
-    // 渲染列表
     render() {
         if (!this.listElement) return;
 
@@ -2961,7 +2956,6 @@ class ListRenderer {
 
     // 添加展开/收起按钮
     addToggleButton() {
-        // 移除所有已有的展开按钮
         const existingButtons = this.listElement.parentNode.querySelectorAll('.add-button[data-toggle="expand"]');
         existingButtons.forEach(button => button.remove());
 
