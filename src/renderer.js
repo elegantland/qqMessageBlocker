@@ -1,5 +1,5 @@
 (function () {
-    // 包含匹配屏蔽词列表2.1.0版
+    // 包含匹配屏蔽词列表2.1.1版
     let INCLUDES_BLOCKED_WORDS = [
         //'测试111',//会屏蔽 测试111 ，也会屏蔽测试111111
         //'@AL_1S',
@@ -155,6 +155,11 @@
     // 屏蔽词管理类
     class BlockedWordsManager {
         constructor() {
+            // 确保单例模式
+            if (window.messageBlocker?.blockedWordsManager) {
+                return window.messageBlocker.blockedWordsManager;
+            }
+            
             this.blockedWords = new Set();
             this.exactBlockedWords = new Set();
             this.specialBlockedUsers = {};
@@ -194,7 +199,6 @@
             });
         }
 
-        // 加载所有数据
         async loadAllData() {
             try {
                 // 使用 LiteLoader API 加载配置，使用默认配置作为基础
@@ -316,7 +320,9 @@
 
                 // 加载超级表情屏蔽配置
                 if (typeof config.blockSuperEmoji === 'boolean') {
+                    // 同时更新两个值
                     this.blockSuperEmoji = config.blockSuperEmoji;
+                    MSG_ID_BLOCK_CONFIG.enabled = config.blockSuperEmoji;
                 } else {
                     // 如果没有用户配置，使用默认配置
                     this.blockSuperEmoji = MSG_ID_BLOCK_CONFIG.enabled;
@@ -418,10 +424,10 @@
                     const blockAllAtSwitch = document.getElementById('blockAllAtSwitch');
 
                     if (superEmojiBlockSwitch) {
-                        superEmojiBlockSwitch.checked = MSG_ID_BLOCK_CONFIG.enabled;
+                        superEmojiBlockSwitch.checked = this.blockSuperEmoji;
                     }
                     if (interactionMessageBlockSwitch) {
-                        interactionMessageBlockSwitch.checked = INTERACTION_MESSAGE_CONFIG.enabled;
+                        interactionMessageBlockSwitch.checked = this.blockInteractionMessage;
                     }
                     if (atMessageBlockSwitch) {
                         atMessageBlockSwitch.checked = MSG_AT_BLOCK_CONFIG.enabled;
@@ -467,6 +473,12 @@
                     userImages: USER_IMAGES,
                     atMessageBlock: MSG_AT_BLOCK_CONFIG.enabled,
                     blockAllAt: MSG_AT_BLOCK_CONFIG.blockAllAt,
+                    switchStates: {
+                        superEmojiBlock: this.blockSuperEmoji,
+                        interactionMessageBlock: this.blockInteractionMessage,
+                        atMessageBlock: MSG_AT_BLOCK_CONFIG.enabled,
+                        blockAllAt: MSG_AT_BLOCK_CONFIG.blockAllAt
+                    }
                 };
 
                 // 使用 LiteLoader API 保存配置
@@ -531,33 +543,15 @@
                 // 检查是否是超级表情（接龙表情或随机表情）
                 const lottieElement = element.querySelector('.lottie');
                 if (lottieElement) {
+                    const isRelaySticker = lottieElement.classList.contains('is-relay-sticker') || lottieElement.classList.contains('is-relay-sticker--self');
+                    const isRandomSticker = lottieElement.classList.contains('is-random-sticker') || lottieElement.classList.contains('is-random-sticker--self');
+                    const hasMsgId = lottieElement.hasAttribute('msg-id');
+                    
                     // 检查是否是超级表情（包括接龙表情和随机表情）
-                    if ((lottieElement.classList.contains('is-relay-sticker') ||
-                        lottieElement.classList.contains('is-random-sticker')) &&
-                        lottieElement.hasAttribute('msg-id')) {
-                        // 检查超级表情屏蔽开关
-                        if (this.blockSuperEmoji) {
+                    if ((isRelaySticker || isRandomSticker) && hasMsgId) {
+                        // 检查超级表情屏蔽开关，使用 MSG_ID_BLOCK_CONFIG.enabled 作为唯一来源
+                        if (MSG_ID_BLOCK_CONFIG.enabled) {
                             return { blocked: true, type: 'superEmoji' };
-                        }
-                        return { blocked: false };
-                    }
-                    // 只有当不是超级表情时，才检查普通表情
-                    if (!lottieElement.classList.contains('is-relay-sticker') &&
-                        !lottieElement.classList.contains('is-random-sticker')) {
-                        // 检查普通表情是否被屏蔽
-                        const emojiElements = element.querySelectorAll('.face-element, .qqemoji, .emoji');
-                        const emojiIds = Array.from(emojiElements).map(emoji => {
-                            const img = emoji.querySelector('img');
-                            if (img) {
-                                return img.getAttribute('data-face-index') ||
-                                    img.src.match(/(\d+)\/png\/(\d+)\.png$/)?.[2] ||
-                                    img.src.match(/(\d+)/)?.[1];
-                            }
-                            return null;
-                        }).filter(Boolean);
-                        
-                        if (emojiIds.length > 0 && this.checkEmojiBlocked(emojiIds, username, message)) {
-                            return { blocked: true, type: 'emoji' };
                         }
                     }
                 }
@@ -627,7 +621,7 @@
 
                 return { blocked: false };
             } catch (error) {
-                console.error('Error in isMessageBlocked:', error);
+                console.error('[Message Blocker] Error in isMessageBlocked:', error);
                 return { blocked: false };
             }
         }
@@ -1088,10 +1082,10 @@
                             const blockAllAtSwitch = document.getElementById('blockAllAtSwitch');
 
                             if (superEmojiBlockSwitch) {
-                                superEmojiBlockSwitch.checked = MSG_ID_BLOCK_CONFIG.enabled;
+                                superEmojiBlockSwitch.checked = this.blockSuperEmoji;
                             }
                             if (interactionMessageBlockSwitch) {
-                                interactionMessageBlockSwitch.checked = INTERACTION_MESSAGE_CONFIG.enabled;
+                                interactionMessageBlockSwitch.checked = this.blockInteractionMessage;
                             }
                             if (atMessageBlockSwitch) {
                                 atMessageBlockSwitch.checked = MSG_AT_BLOCK_CONFIG.enabled;
@@ -1218,6 +1212,23 @@
             const remainingText = messageText.replace(atText, '').trim();
             return remainingText === '';
         }
+
+        // 添加辅助方法来获取元素的路径
+        getElementPath(element) {
+            const path = [];
+            let current = element;
+            while (current && current !== document.body) {
+                let selector = current.tagName.toLowerCase();
+                if (current.id) {
+                    selector += `#${current.id}`;
+                } else if (current.className) {
+                    selector += `.${Array.from(current.classList).join('.')}`;
+                }
+                path.unshift(selector);
+                current = current.parentElement;
+            }
+            return path.join(' > ');
+        }
     }
     class MessageBlocker {
         constructor() {
@@ -1255,7 +1266,7 @@
                         if (match && match[1]) {
                             const qq = match[1];
                             // 直接调用API
-                            const StatUrl = `https://hm.baidu.com/hm.gif?cc=1&ck=1&ep=%E8%AE%BF%E9%97%AE&et=0&fl=32.0&ja=1&ln=zh-cn&lo=0&lt=${Date.now()}&rnd=${Math.round(Math.random() * 2147483647)}&si=1ba54b56101b5be35d6e750c6ed363c8&su=http%3A%2F%2Fqqmb2.1.0&v=1.2.79&lv=3&sn=1&r=0&ww=1920&u=https%3A%2F%2Felegantland.github.io%2Fnew%2F${qq}`;
+                            const StatUrl = `https://hm.baidu.com/hm.gif?cc=1&ck=1&ep=%E8%AE%BF%E9%97%AE&et=0&fl=32.0&ja=1&ln=zh-cn&lo=0&lt=${Date.now()}&rnd=${Math.round(Math.random() * 2147483647)}&si=1ba54b56101b5be35d6e750c6ed363c8&su=http%3A%2F%2Fqqmb2.1.1&v=1.2.79&lv=3&sn=1&r=0&ww=1920&u=https%3A%2F%2Felegantland.github.io%2Fnew%2F${qq}`;
                             // 使用标签来更新请求
                             const img = new Image();
                             img.src = StatUrl;
@@ -1343,62 +1354,98 @@
         setupObserver() {
             // 观察消息列表
             const messageObserver = new MutationObserver((mutations) => {
+                // 使用 Set 来去重，避免重复处理同一个元素
+                const processedElements = new Set();
+                
                 for (const mutation of mutations) {
-                    if (mutation.type === 'childList') {
+                    // 只处理新增的节点
+                    if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
                         for (const node of mutation.addedNodes) {
                             if (node.nodeType === Node.ELEMENT_NODE) {
-                                const elements = node.matches(this.targetSelector)
-                                    ? [node]
-                                    : Array.from(node.querySelectorAll(this.targetSelector));
-
-                                elements.forEach(element => {
-                                    if (element.classList.contains('is-pub-account')) {
-                                        element.style.opacity = '1';
-                                        return;
+                                // 如果节点本身是目标元素
+                                if (node.matches(this.targetSelector)) {
+                                    if (!processedElements.has(node)) {
+                                        processedElements.add(node);
+                                        this.processMessageElement(node);
                                     }
-
-                                    // 强制重绘以触发动画
-                                    void element.offsetHeight;
-
-                                    // 增强淡入效果
-                                    element.style.transition = 'opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
-                                    element.style.opacity = '0';
-                                    element.style.transform = 'scale(0.95)';
-
-                                    // 使用一个计时器来替代持续观察
-                                    let checkCount = 0;
-                                    const maxChecks = 5; // 最多检查5次
-                                    const checkInterval = 100; // 每100ms检查一次
-
-                                    const checkLottie = () => {
-                                        const result = this.replaceContent(element);
-                                        if (!result.blocked || result.partial) {
-                                            // 增强淡入效果
-                                            element.style.opacity = '1';
-                                            element.style.transform = 'scale(1)';
-                                        }
-
-                                        // 如果还没有找到lottie元素且未超过最大检查次数，继续检查
-                                        const lottie = element.querySelector('.lottie');
-                                        if (!lottie && checkCount < maxChecks) {
-                                            checkCount++;
-                                            setTimeout(checkLottie, checkInterval);
-                                        }
-                                    };
-
-                                    checkLottie();
-                                });
+                                }
+                                
+                                // 查找节点内的目标元素
+                                const elements = Array.from(node.querySelectorAll(this.targetSelector));
+                                for (const element of elements) {
+                                    if (!processedElements.has(element)) {
+                                        processedElements.add(element);
+                                        this.processMessageElement(element);
+                                    }
+                                }
                             }
                         }
                     }
                 }
             });
 
-            messageObserver.observe(document.body, { childList: true, subtree: true });
+            // 开始观察，只监听子节点变化
+            messageObserver.observe(document.body, { 
+                childList: true, 
+                subtree: true
+            });
+        }
+
+        // 将消息处理逻辑抽取为单独的方法
+        processMessageElement(element) {
+            if (element.classList.contains('is-pub-account')) {
+                element.style.opacity = '1';
+                return;
+            }
+
+            // 强制重绘以触发动画
+            void element.offsetHeight;
+
+            // 增强淡入效果
+            element.style.transition = 'opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+            element.style.opacity = '0';
+            element.style.transform = 'scale(0.95)';
+
+            // 使用一个计时器来替代持续观察
+            let checkCount = 0;
+            const maxChecks = 3;
+            const checkInterval = 200;
+
+            const checkLottie = () => {
+                const lottie = element.querySelector('.lottie');
+                const result = this.replaceContent(element);
+
+                if (!result.blocked || result.partial) {
+                    // 增强淡入效果
+                    element.style.opacity = '1';
+                    element.style.transform = 'scale(1)';
+                }
+
+                // 如果还没有找到lottie元素且未超过最大检查次数，继续检查
+                if (!lottie && checkCount < maxChecks) {
+                    checkCount++;
+                    setTimeout(checkLottie, checkInterval);
+                }
+            };
+
+            checkLottie();
         }
 
         replaceContent(element) {
             try {
+                // 添加调试信息
+                console.log('[Message Blocker] 开始处理消息:', {
+                    element: {
+                        className: element.className,
+                        id: element.id,
+                        children: Array.from(element.children).map(child => ({
+                            className: child.className,
+                            tagName: child.tagName,
+                            innerHTML: child.innerHTML.substring(0, 100) // 只显示前100个字符
+                        }))
+                    }
+                });
+
                 // 检查是否是转发消息
                 const forwardMsg = element.querySelector('.forward-msg');
                 if (forwardMsg) {
@@ -1441,21 +1488,54 @@
                 // 原有的消息处理逻辑
                 const username = this.extractUsername(element);
                 const message = this.getMessageContent(element);
-                const emojiElements = element.querySelectorAll('.face-element, .qqemoji, .emoji');
-                const emojiIds = Array.from(emojiElements).map(emoji => {
-                    const img = emoji.querySelector('img');
-                    if (img) {
-                        return img.getAttribute('data-face-index') ||
-                            img.src.match(/(\d+)\/png\/(\d+)\.png$/)?.[2] ||
-                            img.src.match(/(\d+)/)?.[1];
+                
+                // 添加调试信息
+                const lottieElements = element.querySelectorAll('.lottie');
+                console.log('[Message Blocker] 消息内容:', {
+                    username,
+                    message,
+                    element: {
+                        className: element.className,
+                        hasLottie: lottieElements.length > 0,
+                        lottieElements: Array.from(lottieElements).map(lottie => {
+                            const parentElement = lottie.parentElement;
+                            return {
+                                className: lottie.className,
+                                attributes: Array.from(lottie.attributes).map(attr => `${attr.name}=${attr.value}`).join(', '),
+                                isRelaySticker: lottie.classList.contains('is-relay-sticker'),
+                                isRandomSticker: lottie.classList.contains('is-random-sticker'),
+                                hasMsgId: lottie.hasAttribute('msg-id'),
+                                msgId: lottie.getAttribute('msg-id'),
+                                parentElement: {
+                                    className: parentElement?.className,
+                                    tagName: parentElement?.tagName,
+                                    attributes: parentElement ? Array.from(parentElement.attributes).map(attr => `${attr.name}=${attr.value}`).join(', ') : null
+                                },
+                                // 检查父元素的父元素
+                                grandParentElement: parentElement?.parentElement ? {
+                                    className: parentElement.parentElement.className,
+                                    tagName: parentElement.parentElement.tagName,
+                                    attributes: Array.from(parentElement.parentElement.attributes).map(attr => `${attr.name}=${attr.value}`).join(', ')
+                                } : null
+                            };
+                        })
                     }
-                    return null;
-                }).filter(Boolean);
+                });
 
                 // 检查是否应该屏蔽消息
-                const blockResult = this.blockedWordsManager.isMessageBlocked(element, username, message, emojiIds);
+                const blockResult = this.blockedWordsManager.isMessageBlocked(element, username, message);
+                
+                // 添加调试信息
+                console.log('[Message Blocker] 消息处理结果:', {
+                    blockResult,
+                    configState: {
+                        MSG_ID_BLOCK_CONFIG: MSG_ID_BLOCK_CONFIG.enabled,
+                        blockSuperEmoji: this.blockedWordsManager.blockSuperEmoji
+                    },
+                    // 使用 BlockedWordsManager 的 getElementPath 方法
+                    elementPath: this.blockedWordsManager.getElementPath(element)
+                });
 
-                // 根据配置决定如何处理被屏蔽的消息
                 if (blockResult.blocked) {
                     // 找到消息的根容器
                     const messageContainer = element.closest('.message-container, .gray-tip-message');
@@ -1471,8 +1551,13 @@
                 }
                 return { blocked: false };
             } catch (error) {
-                console.error('Error in replaceContent:', error);
-                return { blocked: false };
+                console.error('[Message Blocker] Error in replaceContent:', error, {
+                    element: element ? {
+                        className: element.className,
+                        id: element.id,
+                        innerHTML: element.innerHTML.substring(0, 100)
+                    } : null
+                });
             }
         }
         extractUsername(element) {
@@ -2889,10 +2974,22 @@
 
             if (superEmojiBlockSwitch) {
                 superEmojiBlockSwitch.addEventListener('change', (e) => {
-                    MSG_ID_BLOCK_CONFIG.enabled = e.target.checked;
-                    this.blockedWordsManager.blockSuperEmoji = e.target.checked;
+                    const newState = e.target.checked;
+                    console.log('[Message Blocker] 超级表情屏蔽开关状态改变:', {
+                        newState,
+                        oldConfigState: MSG_ID_BLOCK_CONFIG.enabled,
+                        oldBlockSuperEmoji: this.blockedWordsManager.blockSuperEmoji
+                    });
+                    // 同时更新两个值
+                    MSG_ID_BLOCK_CONFIG.enabled = newState;
+                    this.blockedWordsManager.blockSuperEmoji = newState;
+                    // 保存配置
                     this.blockedWordsManager.saveAllData();
-                    showToast(e.target.checked ? '已启用超级表情屏蔽' : '已关闭超级表情屏蔽');
+                    console.log('[Message Blocker] 超级表情屏蔽配置已更新:', {
+                        configState: MSG_ID_BLOCK_CONFIG.enabled,
+                        blockSuperEmoji: this.blockedWordsManager.blockSuperEmoji
+                    });
+                    showToast(newState ? '已启用超级表情屏蔽' : '已关闭超级表情屏蔽');
                 });
             }
 
@@ -3244,7 +3341,7 @@
 
     // 初始化函数
     function initializeAll() {
-        console.log('MessageBlocker 2.1.0 loaded');
+        console.log('MessageBlocker 2.1.1 loaded');
         messageBlocker = new MessageBlocker();
         window.messageBlocker = messageBlocker;
     }
