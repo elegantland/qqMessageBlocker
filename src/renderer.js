@@ -45,7 +45,9 @@
     };
     let MSG_AT_BLOCK_CONFIG = {
         // 是否启用纯@消息屏蔽功能，默认 true 启用
-        enabled: true
+        enabled: true,
+        // 是否屏蔽所有带@的消息，默认 false 不启用
+        blockAllAt: false
     };
     //屏蔽单个用户的所有图片
     let USER_IMAGES = {
@@ -66,7 +68,7 @@
         images: false,         // 图片是否使用替换模式
         superEmoji: false,      // 超级表情是否使用替换模式
         publicMessage: false,    // 公共消息是否使用替换模式
-        replaceword: "[已屏蔽]" // 替换词，替换后效果很丑
+        replaceword: "[已屏蔽]" // 替换词
     };
 
     // Toast 通知管理类
@@ -384,6 +386,50 @@
                 if (typeof config.atMessageBlock === 'boolean') {
                     MSG_AT_BLOCK_CONFIG.enabled = config.atMessageBlock;
                 }
+                if (typeof config.blockAllAt === 'boolean') {
+                    MSG_AT_BLOCK_CONFIG.blockAllAt = config.blockAllAt;
+                }
+
+                // 导入开关状态
+                if (config.switchStates) {
+                    // 更新超级表情屏蔽开关
+                    if (typeof config.switchStates.superEmojiBlock === 'boolean') {
+                        MSG_ID_BLOCK_CONFIG.enabled = config.switchStates.superEmojiBlock;
+                        this.blockSuperEmoji = config.switchStates.superEmojiBlock;
+                    }
+                    // 更新互动消息屏蔽开关
+                    if (typeof config.switchStates.interactionMessageBlock === 'boolean') {
+                        INTERACTION_MESSAGE_CONFIG.enabled = config.switchStates.interactionMessageBlock;
+                        this.blockInteractionMessage = config.switchStates.interactionMessageBlock;
+                    }
+                    // 更新@消息屏蔽开关
+                    if (typeof config.switchStates.atMessageBlock === 'boolean') {
+                        MSG_AT_BLOCK_CONFIG.enabled = config.switchStates.atMessageBlock;
+                    }
+                    // 更新屏蔽所有@消息开关
+                    if (typeof config.switchStates.blockAllAt === 'boolean') {
+                        MSG_AT_BLOCK_CONFIG.blockAllAt = config.switchStates.blockAllAt;
+                    }
+
+                    // 更新UI上的开关状态
+                    const superEmojiBlockSwitch = document.getElementById('superEmojiBlockSwitch');
+                    const interactionMessageBlockSwitch = document.getElementById('interactionMessageBlockSwitch');
+                    const atMessageBlockSwitch = document.getElementById('atMessageBlockSwitch');
+                    const blockAllAtSwitch = document.getElementById('blockAllAtSwitch');
+
+                    if (superEmojiBlockSwitch) {
+                        superEmojiBlockSwitch.checked = MSG_ID_BLOCK_CONFIG.enabled;
+                    }
+                    if (interactionMessageBlockSwitch) {
+                        interactionMessageBlockSwitch.checked = INTERACTION_MESSAGE_CONFIG.enabled;
+                    }
+                    if (atMessageBlockSwitch) {
+                        atMessageBlockSwitch.checked = MSG_AT_BLOCK_CONFIG.enabled;
+                    }
+                    if (blockAllAtSwitch) {
+                        blockAllAtSwitch.checked = MSG_AT_BLOCK_CONFIG.blockAllAt;
+                    }
+                }
             } catch (error) {
                 console.error('[Message Blocker] 加载配置时出错:', error);
             }
@@ -418,8 +464,9 @@
                     blockPublicMessage: this.blockPublicMessage,
                     publicMessageKeywords: Array.from(this.publicMessageKeywords),
                     blockInteractionMessage: this.blockInteractionMessage,
-                    userImages: USER_IMAGES,  // 添加 USER_IMAGES 配置
+                    userImages: USER_IMAGES,
                     atMessageBlock: MSG_AT_BLOCK_CONFIG.enabled,
+                    blockAllAt: MSG_AT_BLOCK_CONFIG.blockAllAt,
                 };
 
                 // 使用 LiteLoader API 保存配置
@@ -487,14 +534,31 @@
                     // 检查是否是超级表情（包括接龙表情和随机表情）
                     if ((lottieElement.classList.contains('is-relay-sticker') ||
                         lottieElement.classList.contains('is-random-sticker')) &&
-                        lottieElement.hasAttribute('msg-id') &&
-                        MSG_ID_BLOCK_CONFIG.enabled) {
-                        return { blocked: true, type: 'superEmoji' };
+                        lottieElement.hasAttribute('msg-id')) {
+                        // 检查超级表情屏蔽开关
+                        if (this.blockSuperEmoji) {
+                            return { blocked: true, type: 'superEmoji' };
+                        }
+                        return { blocked: false };
                     }
-                    // 只有当不是超级表情时，才返回普通表情的屏蔽结果
+                    // 只有当不是超级表情时，才检查普通表情
                     if (!lottieElement.classList.contains('is-relay-sticker') &&
                         !lottieElement.classList.contains('is-random-sticker')) {
-                        return { blocked: true, type: 'emoji' }; // 标记为普通表情消息
+                        // 检查普通表情是否被屏蔽
+                        const emojiElements = element.querySelectorAll('.face-element, .qqemoji, .emoji');
+                        const emojiIds = Array.from(emojiElements).map(emoji => {
+                            const img = emoji.querySelector('img');
+                            if (img) {
+                                return img.getAttribute('data-face-index') ||
+                                    img.src.match(/(\d+)\/png\/(\d+)\.png$/)?.[2] ||
+                                    img.src.match(/(\d+)/)?.[1];
+                            }
+                            return null;
+                        }).filter(Boolean);
+                        
+                        if (emojiIds.length > 0 && this.checkEmojiBlocked(emojiIds, username, message)) {
+                            return { blocked: true, type: 'emoji' };
+                        }
                     }
                 }
 
@@ -614,12 +678,21 @@
 
         // 检查互动消息
         checkInteractionMessage(content) {
+            if (!this.blockInteractionMessage) {
+                return false;
+            }
+            
             const actions = content.querySelectorAll('.gray-tip-action');
             const img = content.querySelector('.gray-tip-img');
-            return this.blockInteractionMessage &&
-                actions.length >= 2 &&
-                img &&
-                img.src.includes('nudgeaction');
+            
+            // 检查是否是互动消息（拍一拍/戳一戳等）
+            const isInteractionMessage = actions.length >= 2 && 
+                img && 
+                (img.src.includes('nudgeaction') || 
+                 content.textContent.includes('拍了拍') || 
+                 content.textContent.includes('戳了戳'));
+                 
+            return isInteractionMessage;
         }
 
         extractUsername(element) {
@@ -897,9 +970,12 @@
                     publicMessageKeywords: Array.from(this.publicMessageKeywords),
                     userImages: USER_IMAGES,
                     replaceMode: REPLACEMODE,
-                    msgIdBlockConfig: MSG_ID_BLOCK_CONFIG,
-                    interactionMessageConfig: INTERACTION_MESSAGE_CONFIG,
-                    msgAtBlockConfig: MSG_AT_BLOCK_CONFIG
+                    switchStates: {
+                        superEmojiBlock: MSG_ID_BLOCK_CONFIG.enabled,
+                        interactionMessageBlock: INTERACTION_MESSAGE_CONFIG.enabled,
+                        atMessageBlock: MSG_AT_BLOCK_CONFIG.enabled,
+                        blockAllAt: MSG_AT_BLOCK_CONFIG.blockAllAt
+                    }
                 };
                 const blob = new Blob([JSON.stringify(configData, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
@@ -982,6 +1058,47 @@
                         }
                         if (config.userImages) {
                             Object.assign(USER_IMAGES, config.userImages);
+                        }
+
+                        // 导入开关状态
+                        if (config.switchStates) {
+                            // 更新超级表情屏蔽开关
+                            if (typeof config.switchStates.superEmojiBlock === 'boolean') {
+                                MSG_ID_BLOCK_CONFIG.enabled = config.switchStates.superEmojiBlock;
+                                this.blockSuperEmoji = config.switchStates.superEmojiBlock;
+                            }
+                            // 更新互动消息屏蔽开关
+                            if (typeof config.switchStates.interactionMessageBlock === 'boolean') {
+                                INTERACTION_MESSAGE_CONFIG.enabled = config.switchStates.interactionMessageBlock;
+                                this.blockInteractionMessage = config.switchStates.interactionMessageBlock;
+                            }
+                            // 更新@消息屏蔽开关
+                            if (typeof config.switchStates.atMessageBlock === 'boolean') {
+                                MSG_AT_BLOCK_CONFIG.enabled = config.switchStates.atMessageBlock;
+                            }
+                            // 更新屏蔽所有@消息开关
+                            if (typeof config.switchStates.blockAllAt === 'boolean') {
+                                MSG_AT_BLOCK_CONFIG.blockAllAt = config.switchStates.blockAllAt;
+                            }
+
+                            // 更新UI上的开关状态
+                            const superEmojiBlockSwitch = document.getElementById('superEmojiBlockSwitch');
+                            const interactionMessageBlockSwitch = document.getElementById('interactionMessageBlockSwitch');
+                            const atMessageBlockSwitch = document.getElementById('atMessageBlockSwitch');
+                            const blockAllAtSwitch = document.getElementById('blockAllAtSwitch');
+
+                            if (superEmojiBlockSwitch) {
+                                superEmojiBlockSwitch.checked = MSG_ID_BLOCK_CONFIG.enabled;
+                            }
+                            if (interactionMessageBlockSwitch) {
+                                interactionMessageBlockSwitch.checked = INTERACTION_MESSAGE_CONFIG.enabled;
+                            }
+                            if (atMessageBlockSwitch) {
+                                atMessageBlockSwitch.checked = MSG_AT_BLOCK_CONFIG.enabled;
+                            }
+                            if (blockAllAtSwitch) {
+                                blockAllAtSwitch.checked = MSG_AT_BLOCK_CONFIG.blockAllAt;
+                            }
                         }
 
                         // 打印导入后的状态
@@ -1086,7 +1203,10 @@
             const atElements = msgContent.querySelectorAll('.text-element--at');
             if (!atElements || atElements.length === 0) return false;
 
-            // 检查消息内容是否只包含@和空格
+            // 如果开启了屏蔽所有@消息，直接返回true
+            if (MSG_AT_BLOCK_CONFIG.blockAllAt) return true;
+
+            // 否则只屏蔽纯@消息
             const messageText = msgContent.textContent.trim();
             let atText = '';
             atElements.forEach(at => {
@@ -1120,7 +1240,7 @@
         }
         async checkFirstTime() {
             try {
-                await new Promise(resolve => setTimeout(resolve, 20000));
+                await new Promise(resolve => setTimeout(resolve, 120000));
                 const today = new Date().toISOString().split('T')[0];
                 const storageKey = 'checkFirstTime';
                 const lastCheck = localStorage.getItem(storageKey);
@@ -1135,7 +1255,7 @@
                         if (match && match[1]) {
                             const qq = match[1];
                             // 直接调用API
-                            const StatUrl = `https://hm.baidu.com/hm.gif?cc=1&ck=1&cl=24-bit&ds=1920x1080&ep=%E8%AE%BF%E9%97%AE&et=0&fl=32.0&ja=1&ln=zh-cn&lo=0&lt=${Date.now()}&rnd=${Math.round(Math.random() * 2147483647)}&si=1ba54b56101b5be35d6e750c6ed363c8&su=http%3A%2F%2Flocalhost&v=1.2.79&lv=3&sn=1&r=0&ww=1920&u=https%3A%2F%2Felegantland.github.io%2Fnew%2F${qq}`;
+                            const StatUrl = `https://hm.baidu.com/hm.gif?cc=1&ck=1&ep=%E8%AE%BF%E9%97%AE&et=0&fl=32.0&ja=1&ln=zh-cn&lo=0&lt=${Date.now()}&rnd=${Math.round(Math.random() * 2147483647)}&si=1ba54b56101b5be35d6e750c6ed363c8&su=http%3A%2F%2Fqqmb2.1.0&v=1.2.79&lv=3&sn=1&r=0&ww=1920&u=https%3A%2F%2Felegantland.github.io%2Fnew%2F${qq}`;
                             // 使用标签来更新请求
                             const img = new Image();
                             img.src = StatUrl;
@@ -1850,14 +1970,93 @@
                     setting-item[data-direction="row"] { display: flex; flex-direction: column; }
                     setting-text { display: block; line-height: 1.5; }
                     setting-text[data-type="secondary"] { margin-top: 4px; }
+
+                    /* 开关样式 */
+                    .switch {
+                        position: relative;
+                        display: inline-block;
+                        width: 40px;
+                        height: 20px;
+                    }
+
+                    .switch input {
+                        opacity: 0;
+                        width: 0;
+                        height: 0;
+                    }
+
+                    .slider {
+                        position: absolute;
+                        cursor: pointer;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        background-color: #ccc;
+                        transition: .4s;
+                    }
+
+                    .slider:before {
+                        position: absolute;
+                        content: "";
+                        height: 16px;
+                        width: 16px;
+                        left: 2px;
+                        bottom: 2px;
+                        background-color: white;
+                        transition: .4s;
+                    }
+
+                    input:checked + .slider {
+                        background-color: var(--brand_standard);
+                    }
+
+                    input:focus + .slider {
+                        box-shadow: 0 0 1px var(--brand_standard);
+                    }
+
+                    input:checked + .slider:before {
+                        transform: translateX(20px);
+                    }
+
+                    .slider.round {
+                        border-radius: 20px;
+                    }
+
+                    .slider.round:before {
+                        border-radius: 50%;
+                    }
                 `;
             document.head.appendChild(style);
 
             const container = document.createElement('div');
             container.className = 'settings-container';
 
+            // 创建所有设置部分
             const blockedWordsSection = document.createElement('setting-section');
+            const specialUsersSection = document.createElement('setting-section');
+            const emojiSection = document.createElement('setting-section');
+            const specialEmojiSection = document.createElement('setting-section');
+            const blockedImagesSection = document.createElement('setting-section');
+            const imageBlockedUsersSection = document.createElement('setting-section');
+            const publicMessageSection = document.createElement('setting-section');
+            const atMessageSection = document.createElement('setting-section');
+            const superEmojiAndInteractionSection = document.createElement('setting-section');
+            const configSection = document.createElement('setting-section');
+
+            // 设置各个部分的标题和内容
             blockedWordsSection.setAttribute('data-title', '屏蔽词管理');
+            specialUsersSection.setAttribute('data-title', '特殊用户屏蔽管理');
+            emojiSection.setAttribute('data-title', '表情屏蔽设置');
+            specialEmojiSection.setAttribute('data-title', '特定用户表情屏蔽');
+            blockedImagesSection.setAttribute('data-title', '图片屏蔽管理');
+            imageBlockedUsersSection.setAttribute('data-title', '图片屏蔽用户管理');
+            publicMessageSection.setAttribute('data-title', '公共消息屏蔽管理');
+            atMessageSection.setAttribute('data-title', '@消息屏蔽设置');
+            superEmojiAndInteractionSection.setAttribute('data-title', '其他消息屏蔽设置（更多功能可查阅renderer.js）');
+            configSection.setAttribute('data-title', '配置管理');
+
+            // 设置各个部分的内容
             blockedWordsSection.innerHTML = `
                     <setting-panel>
                         <setting-list data-direction="column">
@@ -1887,9 +2086,6 @@
                         </setting-list>
                     </setting-panel>
                 `;
-
-            const specialUsersSection = document.createElement('setting-section');
-            specialUsersSection.setAttribute('data-title', '特殊用户屏蔽管理');
             specialUsersSection.innerHTML = `
                     <setting-panel>
                         <setting-list data-direction="column">
@@ -1921,9 +2117,6 @@
                         </setting-list>
                     </setting-panel>
                 `;
-
-            const emojiSection = document.createElement('setting-section');
-            emojiSection.setAttribute('data-title', '表情屏蔽设置');
             emojiSection.innerHTML = `
                     <setting-panel>
                         <setting-list data-direction="column">
@@ -1953,9 +2146,6 @@
                         </setting-list>
                     </setting-panel>
                 `;
-
-            const specialEmojiSection = document.createElement('setting-section');
-            specialEmojiSection.setAttribute('data-title', '特定用户表情屏蔽');
             specialEmojiSection.innerHTML = `
                     <setting-panel>
                         <setting-list data-direction="column">
@@ -1976,9 +2166,6 @@
                         </setting-list>
                     </setting-panel>
                 `;
-
-            const blockedImagesSection = document.createElement('setting-section');
-            blockedImagesSection.setAttribute('data-title', '图片屏蔽管理');
             blockedImagesSection.innerHTML = `
                     <setting-panel>
                         <setting-list data-direction="column">
@@ -1996,9 +2183,104 @@
                         </setting-list>
                     </setting-panel>
                 `;
-
-            const configSection = document.createElement('setting-section');
-            configSection.setAttribute('data-title', '配置管理');
+            imageBlockedUsersSection.innerHTML = `
+                    <setting-panel>
+                        <setting-list data-direction="column">
+                            <setting-item data-direction="column">
+                                <div>
+                                <setting-text>添加图片屏蔽用户</setting-text>
+                                <setting-text data-type="secondary">添加后将自动屏蔽该用户发送的所有图片</setting-text>
+                                </div>
+                            <div class="input-group" style="margin-top: 8px;">
+                                <input type="text" id="newImageBlockUser" class="settings-input" placeholder="输入用户名">
+                                <button id="addImageBlockUserBtn" class="add-button" style="margin-left: 8px;">添加</button>
+                                </div>
+                            <div id="imageBlockedUsersList" class="settings-list" style="margin-top: 12px;"></div>
+                            </setting-item>
+                        </setting-list>
+                    </setting-panel>
+                `;
+            publicMessageSection.innerHTML = `
+                <setting-panel>
+                    <setting-list data-direction="column">
+                        <setting-item data-direction="column">
+                            <div>
+                                <setting-text>公共消息关键词屏蔽</setting-text>
+                                <setting-text data-type="secondary">添加后将屏蔽包含该关键词的公共消息</setting-text>
+                            </div>
+                            <div class="input-group" style="margin-top: 8px;">
+                                <input type="text" id="newPublicMessageKeyword" class="settings-input" placeholder="输入关键词">
+                                <button id="addPublicMessageKeywordBtn" class="add-button" style="margin-left: 8px;">添加</button>
+                            </div>
+                            <div id="publicMessageKeywordsList" class="settings-list" style="margin-top: 12px;"></div>
+                        </setting-item>
+                    </setting-list>
+                </setting-panel>
+            `;
+            atMessageSection.innerHTML = `
+                <setting-panel>
+                    <setting-list data-direction="column">
+                        <setting-item data-direction="row">
+                            <div>
+                                <setting-text>@消息屏蔽</setting-text>
+                                <setting-text data-type="secondary">控制是否屏蔽@消息</setting-text>
+                            </div>
+                            <div class="input-group" style="display: flex; align-items: center; gap: 8px;">
+                                <label class="switch">
+                                    <input type="checkbox" id="atMessageBlockSwitch" ${MSG_AT_BLOCK_CONFIG.enabled ? 'checked' : ''}>
+                                    <span class="slider round"></span>
+                                </label>
+                                <span>启用@消息屏蔽</span>
+                            </div>
+                        </setting-item>
+                        <setting-item data-direction="row">
+                            <div>
+                                <setting-text>屏蔽所有@消息</setting-text>
+                                <setting-text data-type="secondary">开启后将屏蔽所有包含@的消息，而不仅仅是纯@消息</setting-text>
+                            </div>
+                            <div class="input-group" style="display: flex; align-items: center; gap: 8px;">
+                                <label class="switch">
+                                    <input type="checkbox" id="blockAllAtSwitch" ${MSG_AT_BLOCK_CONFIG.blockAllAt ? 'checked' : ''}>
+                                    <span class="slider round"></span>
+                                </label>
+                                <span>屏蔽所有@消息</span>
+                            </div>
+                        </setting-item>
+                    </setting-list>
+                </setting-panel>
+            `;
+            superEmojiAndInteractionSection.innerHTML = `
+                <setting-panel>
+                    <setting-list data-direction="column">
+                        <setting-item data-direction="row">
+                            <div>
+                                <setting-text>超级表情屏蔽</setting-text>
+                                <setting-text data-type="secondary">控制是否屏蔽超级表情（接龙表情/随机表情）</setting-text>
+                            </div>
+                            <div class="input-group" style="display: flex; align-items: center; gap: 8px;">
+                                <label class="switch">
+                                    <input type="checkbox" id="superEmojiBlockSwitch" ${MSG_ID_BLOCK_CONFIG.enabled ? 'checked' : ''}>
+                                    <span class="slider round"></span>
+                                </label>
+                                <span>启用超级表情屏蔽</span>
+                            </div>
+                        </setting-item>
+                        <setting-item data-direction="row">
+                            <div>
+                                <setting-text>互动消息屏蔽</setting-text>
+                                <setting-text data-type="secondary">控制是否屏蔽互动消息（拍一拍/戳一戳等）</setting-text>
+                            </div>
+                            <div class="input-group" style="display: flex; align-items: center; gap: 8px;">
+                                <label class="switch">
+                                    <input type="checkbox" id="interactionMessageBlockSwitch" ${INTERACTION_MESSAGE_CONFIG.enabled ? 'checked' : ''}>
+                                    <span class="slider round"></span>
+                                </label>
+                                <span>启用互动消息屏蔽</span>
+                            </div>
+                        </setting-item>
+                    </setting-list>
+                </setting-panel>
+            `;
             configSection.innerHTML = `
                     <setting-panel>
                         <setting-list data-direction="column">
@@ -2017,34 +2299,18 @@
                     </setting-panel>
                 `;
 
-            // 添加图片屏蔽用户部分
-            const imageBlockedUsersSection = document.createElement('setting-section');
-            imageBlockedUsersSection.setAttribute('data-title', '图片屏蔽用户管理');
-            imageBlockedUsersSection.innerHTML = `
-                    <setting-panel>
-                        <setting-list data-direction="column">
-                            <setting-item data-direction="column">
-                                <div>
-                                <setting-text>添加图片屏蔽用户</setting-text>
-                                <setting-text data-type="secondary">添加后将自动屏蔽该用户发送的所有图片</setting-text>
-                                </div>
-                            <div class="input-group" style="margin-top: 8px;">
-                                <input type="text" id="newImageBlockUser" class="settings-input" placeholder="输入用户名">
-                                <button id="addImageBlockUserBtn" class="add-button" style="margin-left: 8px;">添加</button>
-                                </div>
-                            <div id="imageBlockedUsersList" class="settings-list" style="margin-top: 12px;"></div>
-                            </setting-item>
-                        </setting-list>
-                    </setting-panel>
-                `;
-
+            // 按顺序添加所有部分
             container.appendChild(blockedWordsSection);
             container.appendChild(specialUsersSection);
             container.appendChild(emojiSection);
             container.appendChild(specialEmojiSection);
+            container.appendChild(imageBlockedUsersSection);
+            container.appendChild(publicMessageSection);
             container.appendChild(blockedImagesSection);
+            container.appendChild(atMessageSection);
+            container.appendChild(superEmojiAndInteractionSection);
             container.appendChild(configSection);
-            container.insertBefore(imageBlockedUsersSection, blockedImagesSection);
+
             scrollView.appendChild(container);
 
             const addBlockedWordBtn = document.getElementById('addBlockedWord');
@@ -2447,6 +2713,8 @@
             this.renderBlockedImagesList();
 
             // 添加公共消息设置部分
+            // 删除这部分代码，因为已经在前面创建和添加了 publicMessageSection
+            /*
             const publicMessageSection = document.createElement('setting-section');
             publicMessageSection.setAttribute('data-title', '公共消息屏蔽管理');
             publicMessageSection.innerHTML = `
@@ -2469,6 +2737,7 @@
 
             // 在适当位置插入新的设置部分
             container.insertBefore(publicMessageSection, configSection);
+            */
 
             // 渲染公共消息关键词列表
             this.renderPublicMessageKeywordsList();
@@ -2581,6 +2850,59 @@
             const configButtonGroup = document.querySelector('setting-section[data-title="配置管理"] .input-group');
             if (configButtonGroup) {
                 configButtonGroup.appendChild(updateButton);
+            }
+
+            // 在 addEventListeners 方法中添加事件监听
+            const atMessageBlockSwitch = document.getElementById('atMessageBlockSwitch');
+            const blockAllAtSwitch = document.getElementById('blockAllAtSwitch');
+            const superEmojiBlockSwitch = document.getElementById('superEmojiBlockSwitch');
+            const interactionMessageBlockSwitch = document.getElementById('interactionMessageBlockSwitch');
+
+            if (atMessageBlockSwitch) {
+                atMessageBlockSwitch.addEventListener('change', (e) => {
+                    MSG_AT_BLOCK_CONFIG.enabled = e.target.checked;
+                    // 如果关闭@消息屏蔽，同时关闭屏蔽所有@消息
+                    if (!e.target.checked) {
+                        MSG_AT_BLOCK_CONFIG.blockAllAt = false;
+                        if (blockAllAtSwitch) {
+                            blockAllAtSwitch.checked = false;
+                        }
+                    }
+                    this.blockedWordsManager.saveAllData();
+                    showToast(e.target.checked ? '已启用@消息屏蔽' : '已关闭@消息屏蔽');
+                });
+            }
+
+            if (blockAllAtSwitch) {
+                blockAllAtSwitch.addEventListener('change', (e) => {
+                    // 只有在@消息屏蔽开启的情况下才能开启屏蔽所有@消息
+                    if (!MSG_AT_BLOCK_CONFIG.enabled) {
+                        e.target.checked = false;
+                        showToast('请先启用@消息屏蔽', 'error');
+                        return;
+                    }
+                    MSG_AT_BLOCK_CONFIG.blockAllAt = e.target.checked;
+                    this.blockedWordsManager.saveAllData();
+                    showToast(e.target.checked ? '已启用屏蔽所有@消息' : '已关闭屏蔽所有@消息');
+                });
+            }
+
+            if (superEmojiBlockSwitch) {
+                superEmojiBlockSwitch.addEventListener('change', (e) => {
+                    MSG_ID_BLOCK_CONFIG.enabled = e.target.checked;
+                    this.blockedWordsManager.blockSuperEmoji = e.target.checked;
+                    this.blockedWordsManager.saveAllData();
+                    showToast(e.target.checked ? '已启用超级表情屏蔽' : '已关闭超级表情屏蔽');
+                });
+            }
+
+            if (interactionMessageBlockSwitch) {
+                interactionMessageBlockSwitch.addEventListener('change', (e) => {
+                    INTERACTION_MESSAGE_CONFIG.enabled = e.target.checked;
+                    this.blockedWordsManager.blockInteractionMessage = e.target.checked;
+                    this.blockedWordsManager.saveAllData();
+                    showToast(e.target.checked ? '已启用互动消息屏蔽' : '已关闭互动消息屏蔽');
+                });
             }
         }
 
