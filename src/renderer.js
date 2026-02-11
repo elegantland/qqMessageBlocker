@@ -71,6 +71,88 @@
         replaceword: "[已屏蔽]" // 替换词
     };
 
+    // 日志管理器类
+    class Logger {
+        static instance = null;
+        static enabled = false;
+        static errorCounts = new Map();
+        static errorTimers = new Map();
+        static lastLogTime = new Map();
+
+        static getInstance() {
+            if (!Logger.instance) {
+                Logger.instance = new Logger();
+            }
+            return Logger.instance;
+        }
+
+        static setEnabled(enabled) {
+            Logger.enabled = enabled;
+        }
+
+        static getErrorKey(prefix, error) {
+            return `${prefix}:${error.message}`;
+        }
+
+        static shouldLog(prefix, error, throttleMs = 30000) {
+            if (!Logger.enabled) return false;
+            
+            const key = Logger.getErrorKey(prefix, error);
+            const now = Date.now();
+            
+            const lastTime = Logger.lastLogTime.get(key) || 0;
+            if (now - lastTime < throttleMs) {
+                return false;
+            }
+            
+            Logger.lastLogTime.set(key, now);
+            return true;
+        }
+
+        static error(prefix, error, context = null) {
+            if (!Logger.enabled) return;
+            
+            const key = Logger.getErrorKey(prefix, error);
+            const count = (Logger.errorCounts.get(key) || 0) + 1;
+            Logger.errorCounts.set(key, count);
+
+            if (Logger.shouldLog(prefix, error)) {
+                console.error(`[Message Blocker] ${prefix}:`, error, context ? { context, totalCount: count } : { totalCount: count });
+            }
+
+            Logger.clearOldError(key);
+        }
+
+        static log(message) {
+            if (!Logger.enabled) return;
+            console.log(`[Message Blocker] ${message}`);
+        }
+
+        static warn(message) {
+            if (!Logger.enabled) return;
+            console.warn(`[Message Blocker] ${message}`);
+        }
+
+        static clearOldError(key) {
+            if (Logger.errorTimers.has(key)) {
+                clearTimeout(Logger.errorTimers.get(key));
+            }
+            const timer = setTimeout(() => {
+                Logger.errorCounts.delete(key);
+                Logger.lastLogTime.delete(key);
+                Logger.errorTimers.delete(key);
+            }, 60000);
+            Logger.errorTimers.set(key, timer);
+        }
+
+        static clearAll() {
+            Logger.errorCounts.clear();
+            Logger.errorTimers.forEach(timer => clearTimeout(timer));
+            Logger.errorTimers.clear();
+            Logger.lastLogTime.clear();
+        }
+    }
+
     // Toast 通知管理类
     class Toast {
         static instance = null;
@@ -189,7 +271,8 @@
                 blockSuperEmoji: MSG_ID_BLOCK_CONFIG.enabled,
                 blockPublicMessage: MSG_ID_BLOCK_CONFIG.enabled,
                 publicMessageKeywords: PUBLIC_MESSAGE_KEYWORDS,
-                blockInteractionMessage: INTERACTION_MESSAGE_CONFIG.enabled
+                blockInteractionMessage: INTERACTION_MESSAGE_CONFIG.enabled,
+                debugLogEnabled: false
             };
 
             // 加载配置
@@ -450,8 +533,13 @@
                         blockAllAtSwitch.checked = MSG_AT_BLOCK_CONFIG.blockAllAt;
                     }
                 }
+
+                // 加载日志开关配置
+                if (typeof config.debugLogEnabled === 'boolean') {
+                    Logger.setEnabled(config.debugLogEnabled);
+                }
             } catch (error) {
-                console.error('[Message Blocker] 加载配置时出错:', error);
+                Logger.error('加载配置时出错', error);
             }
         }
 
@@ -488,6 +576,7 @@
                     userImages: this.userImages,
                     atMessageBlock: MSG_AT_BLOCK_CONFIG.enabled,
                     blockAllAt: MSG_AT_BLOCK_CONFIG.blockAllAt,
+                    debugLogEnabled: Logger.enabled,
                     switchStates: {
                         superEmojiBlock: this.blockSuperEmoji,
                         interactionMessageBlock: this.blockInteractionMessage,
@@ -498,9 +587,9 @@
 
                 // 使用 LiteLoader API 保存配置
                 await LiteLoader.api.config.set("message_blocker", dataToSave);
-		console.log('[Message Blocker] 配置已永久保存');
+                Logger.log('配置已永久保存');
             } catch (error) {
-                console.error('保存配置时出错:', error);
+                Logger.error('saveAllData', error);
                 showToast('保存配置失败', 'error');
             }
         }
@@ -612,6 +701,10 @@
                     // 公共消息和系统消息检查
                     () => this.checkPublicMessage(element),
 
+                    // 表情检查
+                    () => this.isBlockedEmoji(element) &&
+                        { blocked: true, type: 'emoji' },
+
                     // 用户名检查
                     () => username && this.blockedWords.has(username) &&
                         { blocked: true, type: 'user' },
@@ -636,7 +729,7 @@
 
                 return { blocked: false };
             } catch (error) {
-                console.error('[Message Blocker] Error in isMessageBlocked:', error);
+                Logger.error('isMessageBlocked', error, { username, message });
                 return { blocked: false };
             }
         }
@@ -736,7 +829,7 @@
 
                 return '';
             } catch (error) {
-                console.error('获取用户名时出错:', error);
+                Logger.error('extractUsername', error);
                 return '';
             }
         }
@@ -790,6 +883,48 @@ isBlockedImage(element) {
         if (pattern && (imgHash.includes(pattern) || fileName.includes(pattern))) {
             return true;
         }
+    }
+
+    return false;
+}
+
+// 检查表情是否被屏蔽
+isBlockedEmoji(element) {
+    if (!element) return false;
+
+    // 查找表情元素
+    const emojiElement = element.querySelector('img.qqemoji, img.emoji, .face-element__icon');
+    if (!emojiElement) return false;
+
+    // 获取表情ID
+    const emojiId = emojiElement.getAttribute('data-face-index') ||
+        emojiElement.src.match(/(\d+)\/png\/(\d+)\.png$/)?.[2] ||
+        emojiElement.src.match(/(\d+)/)?.[1];
+
+    if (!emojiId) return false;
+
+    const numEmojiId = Number(emojiId);
+    if (isNaN(numEmojiId)) return false;
+
+    // 获取消息内容，判断是否有其他内容
+    const messageContent = element.querySelector('.message-content');
+    const textElement = element.querySelector('.text-normal');
+    const hasOtherContent = textElement && textElement.textContent.trim().length > 0;
+
+    // 检查完全匹配（仅当消息只包含表情时）
+    if (!hasOtherContent && this.exactBlockedEmojis.has(numEmojiId)) {
+        return true;
+    }
+
+    // 检查包含匹配（无论消息是否包含其他内容）
+    if (this.includeBlockedEmojis.has(numEmojiId)) {
+        return true;
+    }
+
+    // 检查用户特定屏蔽
+    const username = this.extractUsername(element);
+    if (username && this.specialBlockedUsersEmojis[username]?.includes(numEmojiId)) {
+        return true;
     }
 
     return false;
@@ -1006,7 +1141,7 @@ async removeBlockedImage(imageFileName) {
                 URL.revokeObjectURL(url);
                 showToast('配置导出成功', 'success');
             } catch (error) {
-                console.error('导出配置时出错:', error);
+                Logger.error('exportConfig', error);
                 showToast('导出配置失败', 'error');
             }
         }
@@ -1017,15 +1152,12 @@ async removeBlockedImage(imageFileName) {
                 const reader = new FileReader();
                 reader.onload = async (e) => {
                     try {
-                        console.log('读取到的配置文件内容:', e.target.result);
                         const config = JSON.parse(e.target.result);
 
                         // 验证配置格式
                         if (!config || typeof config !== 'object') {
                             throw new Error('无效的配置文件格式');
                         }
-
-                        console.log('解析后的配置对象:', config);
 
                         // 清空现有配置
                         this.blockedWords.clear();
@@ -1042,7 +1174,6 @@ async removeBlockedImage(imageFileName) {
 
                         // 导入新配置
                         if (Array.isArray(config.blockedWords)) {
-                            console.log('导入 blockedWords:', config.blockedWords);
                             config.blockedWords.forEach(word => this.blockedWords.add(word));
                         }
                         if (Array.isArray(config.exactBlockedWords)) {
@@ -1118,9 +1249,6 @@ async removeBlockedImage(imageFileName) {
                                 blockAllAtSwitch.checked = MSG_AT_BLOCK_CONFIG.blockAllAt;
                             }
                         }
-
-                        // 打印导入后的状态
-                        console.log('导入后的 publicMessageKeywords:', Array.from(this.publicMessageKeywords));
 
                         // 保存并更新UI
                         await this.saveAllData();
@@ -1445,7 +1573,7 @@ processMessageElement(element) {
             element.style.opacity = '0';
 
             let checkCount = 0;
-            const maxChecks = 8; // 增加检查次数（约2秒）
+            const maxChecks = 4; // 增加检查次数
             const checkInterval = 150;
 
             const checkContent = () => {
@@ -1548,11 +1676,10 @@ if (blockResult.blocked) {
 }
                 return { blocked: false };
             } catch (error) {
-                console.error('[Message Blocker] Error in replaceContent:', error, {
+                Logger.error('replaceContent', error, {
                     element: element ? {
                         className: element.className,
-                        id: element.id,
-                        innerHTML: element.innerHTML.substring(0, 100)
+                        id: element.id
                     } : null
                 });
             }
@@ -1589,7 +1716,7 @@ if (blockResult.blocked) {
 
                 return '';
             } catch (error) {
-                console.error('获取用户名时出错:', error);
+                Logger.error('extractUsername', error);
                 return '';
             }
         }
@@ -1793,7 +1920,7 @@ async deleteWord(word) {
                 this.refreshMessages();
                 showToast(`已删除完全匹配屏蔽词: ${word}`, 'success');
             } catch (error) {
-                console.error('Error in deleteExactWord:', error);
+                Logger.error('deleteExactWord', error, { word });
                 showToast('删除失败，请重试', 'error');
             }
         }
@@ -2045,7 +2172,7 @@ showBlockedWordsModal() {
     try {
         scrollView.innerHTML = ''; 
     } catch (e) {
-        console.warn('[Message Blocker] 忽略组件销毁异常:', e);
+        Logger.warn('忽略组件销毁异常');
     }
 
     // 2. 注入样式 (如果还没注入过)
@@ -2376,6 +2503,19 @@ showBlockedWordsModal() {
                                     <span class="slider round"></span>
                                 </label>
                                 <span>启用互动消息屏蔽</span>
+                            </div>
+                        </setting-item>
+                        <setting-item data-direction="row">
+                            <div>
+                                <setting-text>调试日志</setting-text>
+                                <setting-text data-type="secondary">启用后会输出详细日志，仅用于调试</setting-text>
+                            </div>
+                            <div class="input-group" style="display: flex; align-items: center; gap: 8px;">
+                                <label class="switch">
+                                    <input type="checkbox" id="debugLogSwitch">
+                                    <span class="slider round"></span>
+                                </label>
+                                <span>启用调试日志</span>
                             </div>
                         </setting-item>
                     </setting-list>
@@ -3007,20 +3147,11 @@ showBlockedWordsModal() {
             if (superEmojiBlockSwitch) {
                 superEmojiBlockSwitch.addEventListener('change', (e) => {
                     const newState = e.target.checked;
-                    console.log('[Message Blocker] 超级表情屏蔽开关状态改变:', {
-                        newState,
-                        oldConfigState: MSG_ID_BLOCK_CONFIG.enabled,
-                        oldBlockSuperEmoji: this.blockedWordsManager.blockSuperEmoji
-                    });
                     // 同时更新两个值
                     MSG_ID_BLOCK_CONFIG.enabled = newState;
                     this.blockedWordsManager.blockSuperEmoji = newState;
                     // 保存配置
                     this.blockedWordsManager.saveAllData();
-                    console.log('[Message Blocker] 超级表情屏蔽配置已更新:', {
-                        configState: MSG_ID_BLOCK_CONFIG.enabled,
-                        blockSuperEmoji: this.blockedWordsManager.blockSuperEmoji
-                    });
                     showToast(newState ? '已启用超级表情屏蔽' : '已关闭超级表情屏蔽');
                 });
             }
@@ -3033,148 +3164,127 @@ showBlockedWordsModal() {
                     showToast(e.target.checked ? '已启用互动消息屏蔽' : '已关闭互动消息屏蔽');
                 });
             }
+
+            const debugLogSwitch = document.getElementById('debugLogSwitch');
+            if (debugLogSwitch) {
+                debugLogSwitch.checked = Logger.enabled;
+                debugLogSwitch.addEventListener('change', (e) => {
+                    Logger.setEnabled(e.target.checked);
+                    this.blockedWordsManager.saveAllData();
+                    showToast(e.target.checked ? '已启用调试日志' : '已关闭调试日志');
+                });
+            }
         }
 
         setupContextMenu() {
+            let observer = null;
+            let observerTimeout = null;
+
             document.addEventListener('mouseup', (event) => {
-                if (event.button === 2) { // 右键点击
+                if (event.button === 2) {
                     this.targetEvent = event;
 
-                    // 等待QQ的原生菜单出现
-                    setTimeout(() => {
-                        const qContextMenu = document.querySelector('.q-context-menu');
-                        if (!qContextMenu) return;
+                    const target = event.target;
 
-                        // 清除之前可能存在的菜单项
+                    const createSeparator = () => {
+                        const separator = document.createElement('div');
+                        separator.className = 'q-context-menu-separator blocker-menu-item';
+                        return separator;
+                    };
+
+                    const createMenuItem = (text, onClick) => {
+                        const item = document.createElement('div');
+                        item.className = 'q-context-menu-item blocker-menu-item';
+
+                        const iconContainer = document.createElement('i');
+                        iconContainer.className = 'q-icon';
+                        iconContainer.innerHTML = '<svg width="13" height="13" viewBox="0 0 13 13"><path d="M1.5 3.5h10m-8.5 7h7a1 1 0 001-1v-6h-9v6a1 1 0 001 1zm2-9l.5-1h3l.5 1" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>';
+
+                        const textContainer = document.createElement('span');
+                        textContainer.className = 'q-context-menu-item__text';
+                        textContainer.textContent = text;
+
+                        const contentWrapper = document.createElement('div');
+                        contentWrapper.className = 'q-context-menu-item__content';
+                        contentWrapper.style.display = 'flex';
+                        contentWrapper.style.alignItems = 'center';
+                        contentWrapper.style.width = '100%';
+
+                        contentWrapper.appendChild(iconContainer);
+                        contentWrapper.appendChild(textContainer);
+                        item.appendChild(contentWrapper);
+
+                        item.onclick = onClick;
+                        return item;
+                    };
+
+                    const addMenuItems = (qContextMenu) => {
                         const oldItems = qContextMenu.querySelectorAll('.blocker-menu-item');
                         oldItems.forEach(item => item.remove());
 
-                        // 获取点击的元素
-                        const target = event.target;
-
-                        // 创建分隔线
-                        const createSeparator = () => {
-                            const separator = document.createElement('div');
-                            separator.className = 'q-context-menu-separator blocker-menu-item';
-                            return separator;
-                        };
-
-                        // 创建菜单项的函数
-                        const createMenuItem = (text, onClick) => {
-                            const item = document.createElement('div');
-                            item.className = 'q-context-menu-item blocker-menu-item';
-
-                            // 创建图标容器
-                            const iconContainer = document.createElement('i');
-                            iconContainer.className = 'q-icon';
-                            iconContainer.innerHTML = '<svg width="13" height="13" viewBox="0 0 13 13"><path d="M1.5 3.5h10m-8.5 7h7a1 1 0 001-1v-6h-9v6a1 1 0 001 1zm2-9l.5-1h3l.5 1" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>';
-
-                            // 创建文本容器
-                            const textContainer = document.createElement('span');
-                            textContainer.className = 'q-context-menu-item__text';
-                            textContainer.textContent = text;
-
-                            // 创建内容包装器
-                            const contentWrapper = document.createElement('div');
-                            contentWrapper.className = 'q-context-menu-item__content';
-                            contentWrapper.style.display = 'flex';
-                            contentWrapper.style.alignItems = 'center';
-                            contentWrapper.style.width = '100%';
-
-                            // 组装菜单项
-                            contentWrapper.appendChild(iconContainer);
-                            contentWrapper.appendChild(textContainer);
-                            item.appendChild(contentWrapper);
-
-                            item.onclick = onClick;
-                            return item;
-                        };
-
-                        // 添加分隔线和菜单项的函数
                         const addMenuItem = (item) => {
-                            // 如果这是第一个自定义菜单项，先添加分隔线
                             if (!qContextMenu.querySelector('.blocker-menu-item')) {
                                 qContextMenu.appendChild(createSeparator());
                             }
                             qContextMenu.appendChild(item);
                         };
 
-                        // 添加通用的手动刷新消息选项
-                        // const refreshItem = createMenuItem('手动刷新消息', () => {
-                        //     this.refreshMessages();
-                        //     showToast('已刷新消息屏蔽状态', 'success');
-                        //     qContextMenu.style.display = 'none';
-                        // });
-                        // addMenuItem(refreshItem);
-
-                        // 处理文本消息
                         const messageElement = target.closest('.msg-content-container');
                         if (messageElement) {
-                            // 优先获取文本元素内容
-                                const textElement = messageElement.querySelector('.text-element .text-normal');
-                                if (textElement) {
-                                    const content = textElement.textContent.trim();
-                                    if (content) {
-                                        const item = createMenuItem('添加为屏蔽词', () => {
-                                            this.blockedWordsManager.addBlockedWord(content);
-                                            this.blockedWordsManager.saveAllData();
-                                            this.refreshMessages();
-                                            showToast(`已添加屏蔽词: ${content}`, 'success');
-                                            qContextMenu.style.display = 'none';
-                                        });
-                                        addMenuItem(item);
-                                    }
+                            const textElement = messageElement.querySelector('.text-element .text-normal');
+                            if (textElement) {
+                                const content = textElement.textContent.trim();
+                                if (content) {
+                                    const item = createMenuItem('添加为屏蔽词', () => {
+                                        this.blockedWordsManager.addBlockedWord(content);
+                                        this.blockedWordsManager.saveAllData();
+                                        this.refreshMessages();
+                                        showToast(`已添加屏蔽词: ${content}`, 'success');
+                                        qContextMenu.style.display = 'none';
+                                    });
+                                    addMenuItem(item);
                                 }
+                            }
                         }
 
-// 处理图片 (修改点：使用 data-role="pic" 定位)
-const imgElement = target.closest('img[data-role="pic"]');
-if (imgElement) {
-    const dataPath = imgElement.getAttribute('data-path') || imgElement.src;
-    if (dataPath) {
-        const rawFileName = dataPath.split('/').pop();
-        const fileName = rawFileName.split('_')[0].split('.')[0];
+                        const imgElement = target.closest('img[data-role="pic"]');
+                        if (imgElement) {
+                            const dataPath = imgElement.getAttribute('data-path') || imgElement.src;
+                            if (dataPath) {
+                                const rawFileName = dataPath.split('/').pop();
+                                const fileName = rawFileName.split('_')[0].split('.')[0];
 
-        // 获取发送图片的用户名
-        const rootContainer = imgElement.closest('.message-container');
-        const username = rootContainer ? this.extractUsername(rootContainer) : null;
+                                const rootContainer = imgElement.closest('.message-container');
+                                const username = rootContainer ? this.extractUsername(rootContainer) : null;
 
-        // 1. 屏蔽此图片特征
-        const blockImageItem = createMenuItem('屏蔽此图片', () => {
-            this.blockedWordsManager.addBlockedImage(fileName);
-            this.blockedWordsManager.saveAllData();
-            this.refreshMessages();
-            showToast(`已屏蔽该图片特征: ${fileName}`, 'success');
-            qContextMenu.style.display = 'none';
-        });
-        addMenuItem(blockImageItem);
+                                const blockImageItem = createMenuItem('屏蔽此图片', () => {
+                                    this.blockedWordsManager.addBlockedImage(fileName);
+                                    this.blockedWordsManager.saveAllData();
+                                    this.refreshMessages();
+                                    showToast(`已屏蔽该图片特征: ${fileName}`, 'success');
+                                    qContextMenu.style.display = 'none';
+                                });
+                                addMenuItem(blockImageItem);
 
-        // 如果能获取到用户名,添加屏蔽该用户所有图片的选项
-        if (username) {
-            const blockUserImagesItem = createMenuItem(`屏蔽 ${username} 的所有图片`, () => {
-                this.blockedWordsManager.addImageBlockedUser(username);
-                this.blockedWordsManager.saveAllData();
-                this.refreshMessages();
-                showToast(`已屏蔽 ${username} 的所有图片`, 'success');
-                qContextMenu.style.display = 'none';
-            });
-            addMenuItem(blockUserImagesItem);
-        }
-    }
-}
+                                if (username) {
+                                    const blockUserImagesItem = createMenuItem(`屏蔽 ${username} 的所有图片`, () => {
+                                        this.blockedWordsManager.addImageBlockedUser(username);
+                                        this.blockedWordsManager.saveAllData();
+                                        this.refreshMessages();
+                                        showToast(`已屏蔽 ${username} 的所有图片`, 'success');
+                                        qContextMenu.style.display = 'none';
+                                    });
+                                    addMenuItem(blockUserImagesItem);
+                                }
+                            }
+                        }
 
-                        // 处理emoji表情
                         const emojiElement = target.closest('img.qqemoji, img.emoji, .face-element__icon');
                         if (emojiElement) {
-                            // 获取表情ID
-                            const emojiId = emojiElement.src.match(/(\d+)\/png\/(\d+)\.png$/)?.[2] || // 新格式
-                                emojiElement.getAttribute('data-face-index') ||             // data-face-index属性
-                                emojiElement.src.match(/(\d+)/)?.[1];                      // 旧格式
+                            const emojiId = emojiElement.src.match(/(\d+)\/png\/(\d+)\.png$/)?.[2] ||
+                                emojiElement.getAttribute('data-face-index') ||
+                                emojiElement.src.match(/(\d+)/)?.[1];
                             if (emojiId) {
-                                // 获取消息容器，用于后续刷新
-                                const messageContainer = emojiElement.closest('.message-container');
-
-                                // 添加完全匹配屏蔽选项
                                 const exactItem = createMenuItem('完全屏蔽此表情', () => {
                                     if (this.blockedWordsManager.addBlockedEmoji(emojiId, 'exact')) {
                                         this.refreshMessages();
@@ -3184,7 +3294,6 @@ if (imgElement) {
                                 });
                                 addMenuItem(exactItem);
 
-                                // 添加包含匹配屏蔽选项
                                 const includeItem = createMenuItem('包含屏蔽此表情', () => {
                                     if (this.blockedWordsManager.addBlockedEmoji(emojiId, 'include')) {
                                         this.refreshMessages();
@@ -3195,7 +3304,58 @@ if (imgElement) {
                                 addMenuItem(includeItem);
                             }
                         }
-                    }, 0);
+                    };
+
+                    const qContextMenu = document.querySelector('.q-context-menu');
+                    if (qContextMenu) {
+                        addMenuItems(qContextMenu);
+                        return;
+                    }
+
+                    if (observerTimeout) {
+                        clearTimeout(observerTimeout);
+                    }
+                    if (observer) {
+                        observer.disconnect();
+                    }
+
+                    observer = new MutationObserver((mutations) => {
+                        for (const mutation of mutations) {
+                            for (const node of mutation.addedNodes) {
+                                if (node.nodeType === Node.ELEMENT_NODE) {
+                                    if (node.classList && node.classList.contains('q-context-menu')) {
+                                        addMenuItems(node);
+                                        observerTimeout = setTimeout(() => {
+                                            observer.disconnect();
+                                            observer = null;
+                                        }, 100);
+                                        return;
+                                    }
+                                    const foundMenu = node.querySelector && node.querySelector('.q-context-menu');
+                                    if (foundMenu) {
+                                        addMenuItems(foundMenu);
+                                        observerTimeout = setTimeout(() => {
+                                            observer.disconnect();
+                                            observer = null;
+                                        }, 100);
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+                    observer.observe(document.body, {
+                        childList: true,
+                        subtree: true
+                    });
+
+                    observerTimeout = setTimeout(() => {
+                        if (observer) {
+                            observer.disconnect();
+                            observer = null;
+                        }
+                    }, 200);
                 }
             });
         }
@@ -3317,7 +3477,7 @@ if (imgElement) {
         renderPublicMessageKeywordsList() {
             const keywordsList = document.getElementById('publicMessageKeywordsList');
             if (!keywordsList) {
-                console.log('cant find publicMessageKeywordsList');
+                Logger.warn('未找到 publicMessageKeywordsList 元素');
                 return;
             }
 
@@ -3383,7 +3543,7 @@ if (imgElement) {
 
     // 初始化函数
     function initializeAll() {
-        console.log('MessageBlocker 2.1.2 loaded');
+        Logger.log('MessageBlocker 2.1.2 loaded');
         messageBlocker = new MessageBlocker();
         window.messageBlocker = messageBlocker;
     }
